@@ -35,6 +35,29 @@ function ToolsPage() {
   const [q, setQ] = useState("");
   const [activeCat, setActiveCat] = useState<string | null>(null);
   const [attachOpenFor, setAttachOpenFor] = useState<string | null>(null); // toolId
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyUrl = async (id: string, url: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        // 폴백: 임시 textarea
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopiedId(id);
+      setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1500);
+    } catch {
+      window.prompt("링크 복사 (Ctrl/Cmd+C)", url);
+    }
+  };
 
   const categories = useMemo(() => {
     const set = new Set<string>();
