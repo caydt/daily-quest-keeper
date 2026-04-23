@@ -15,11 +15,13 @@ export type Task = {
   postponedCount?: number;
   order: number;
   projectId?: string | null; // 프로젝트에 속한 서브태스크
+  toolIds?: string[]; // 첨부된 도구 ID들 (시트 행 ID 또는 name)
 };
 
 export type Settings = {
   morningTime: string; // "HH:MM"
   eveningTime: string;
+  toolsSheetUrl?: string; // 공개 구글 시트 URL (도구 라이브러리)
 };
 
 export type DayLog = {
