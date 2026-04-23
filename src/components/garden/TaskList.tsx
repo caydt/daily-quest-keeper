@@ -2,20 +2,9 @@ import { useState } from "react";
 import type { Task, TaskKind } from "@/lib/garden-store";
 import { XP_REWARD, XP_PENALTY } from "@/lib/garden-store";
 import {
-  DndContext,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
-  type DragEndEvent,
-  DragOverlay,
-  type DragStartEvent,
-} from "@dnd-kit/core";
-import {
   SortableContext,
   verticalListSortingStrategy,
   useSortable,
-  arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
