@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { useGarden, todayStr } from "@/lib/garden-store";
+import { useGarden, todayStr, filterTasksByCondition, CONDITION_META } from "@/lib/garden-store";
+import type { ConditionMode } from "@/lib/garden-store";
 import { useReminders, requestNotificationPermission } from "@/lib/notifications";
 import { Avatar } from "@/components/garden/Avatar";
 import { TaskList } from "@/components/garden/TaskList";
@@ -8,6 +9,7 @@ import { ProjectList } from "@/components/garden/ProjectList";
 import { QuestPanel } from "@/components/garden/QuestPanel";
 import { AchievementCodex } from "@/components/garden/AchievementCodex";
 import { SidePanels } from "@/components/garden/SidePanels";
+import { ConditionSelector } from "@/components/garden/ConditionSelector";
 import { Settings as SettingsIcon, BarChart3, Bell, BellOff, Wrench } from "lucide-react";
 import {
   DndContext,
@@ -43,6 +45,8 @@ function Index() {
   const {
     state,
     hydrated,
+    todayCondition,
+    setCondition,
     addTask,
     toggleTask,
     deleteTask,
@@ -58,6 +62,11 @@ function Index() {
   const today = todayStr();
   const todaysTasks = state.tasks.filter((t) => t.date === today);
   const standalone = todaysTasks.filter((t) => !t.projectId);
+
+  // 컨디션 필터 적용
+  const visibleStandalone = todayCondition
+    ? filterTasksByCondition(standalone, todayCondition)
+    : standalone;
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -128,6 +137,9 @@ function Index() {
 
   return (
     <div className="min-h-dvh px-4 py-6 md:px-10 md:py-10">
+      {/* 컨디션 미선택 시 오버레이 */}
+      {!todayCondition && <ConditionSelector onSelect={setCondition} />}
+
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Game HUD top bar */}
         <header className="flex items-center justify-between gap-4 border-b border-white/5 pb-4">
@@ -140,6 +152,13 @@ function Index() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {/* 컨디션 칩 — 현재 상태 표시 + 클릭 시 변경 */}
+            {todayCondition && (
+              <ConditionChip
+                condition={todayCondition}
+                onChange={setCondition}
+              />
+            )}
             <button
               onClick={handleToggleNotifications}
               className="size-10 rounded-xl bg-card/60 border border-white/10 hover:border-primary/40 transition flex items-center justify-center"
@@ -200,7 +219,7 @@ function Index() {
                 onAssignTask={assignTaskToProject}
               />
               <TaskList
-                tasks={standalone}
+                tasks={visibleStandalone}
                 onToggle={toggleTask}
                 onDelete={deleteTask}
                 onPostpone={postponeTask}
@@ -221,6 +240,54 @@ function Index() {
           <span className="text-primary">{state.settings.eveningTime}</span>에 정원이 당신을 부릅니다.
         </footer>
       </div>
+    </div>
+  );
+}
+
+// 헤더 컨디션 칩: 클릭하면 드롭다운으로 변경 가능
+function ConditionChip({
+  condition,
+  onChange,
+}: {
+  condition: ConditionMode;
+  onChange: (m: ConditionMode) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const meta = CONDITION_META[condition];
+  const ALL: ConditionMode[] = ["best", "normal", "low", "sick"];
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 bg-card/60 hover:border-primary/40 text-xs font-medium transition"
+      >
+        <span>{meta.icon}</span>
+        <span className={meta.color}>{meta.label}</span>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-xl border border-white/10 bg-card shadow-xl overflow-hidden">
+            {ALL.map((m) => {
+              const cm = CONDITION_META[m];
+              return (
+                <button
+                  key={m}
+                  onClick={() => { onChange(m); setOpen(false); }}
+                  className={`w-full flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-white/5 transition text-left ${m === condition ? "bg-white/5" : ""}`}
+                >
+                  <span>{cm.icon}</span>
+                  <div>
+                    <p className={`font-medium ${cm.color}`}>{cm.label}</p>
+                    <p className="text-muted-foreground text-[10px]">{cm.desc}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }

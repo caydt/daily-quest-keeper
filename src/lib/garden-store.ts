@@ -2,6 +2,18 @@ import { useEffect, useState, useCallback } from "react";
 
 export type TaskKind = "must" | "flex"; // must = 당일 필수(벌점), flex = 연기 가능(벌점 없음)
 
+export type ConditionMode = "best" | "normal" | "low" | "sick";
+
+export const CONDITION_META: Record<
+  ConditionMode,
+  { label: string; icon: string; desc: string; color: string }
+> = {
+  best:   { label: "최상",  icon: "🔥", desc: "전체 할일",              color: "text-amber-400"   },
+  normal: { label: "보통",  icon: "😊", desc: "필수 + 어려운 할일",     color: "text-emerald-400" },
+  low:    { label: "저조",  icon: "😔", desc: "필수 할일만",             color: "text-blue-400"    },
+  sick:   { label: "아픔",  icon: "🤒", desc: "최소 필수만 (쉬어가요)", color: "text-rose-400"    },
+};
+
 export type Task = {
   id: string;
   title: string;
@@ -66,6 +78,25 @@ export type GardenState = {
   settings: Settings;
   history: DayLog[];
   achievements: Record<string, number>; // id -> unlockedAt timestamp
+  condition: ConditionMode | null;     // 오늘 컨디션 (null = 아직 미선택)
+  conditionSetOn: string | null;       // YYYY-MM-DD: 언제 설정했는지
+};
+
+// 컨디션에 따라 오늘 태스크를 필터링
+export const filterTasksByCondition = (tasks: Task[], condition: ConditionMode): Task[] => {
+  switch (condition) {
+    case "best":
+      return tasks;
+    case "normal":
+      // 필수(must) 전체 + flex 중 hard
+      return tasks.filter((t) => t.kind === "must" || t.difficulty === "hard");
+    case "low":
+      // must 할일만
+      return tasks.filter((t) => t.kind === "must");
+    case "sick":
+      // must 중 hard만 (절대 최소)
+      return tasks.filter((t) => t.kind === "must" && t.difficulty === "hard");
+  }
 };
 
 const STORAGE_KEY = "lumi-garden-v3";
@@ -135,6 +166,8 @@ const initial: GardenState = {
   settings: { morningTime: "08:00", eveningTime: "21:00" },
   history: [],
   achievements: {},
+  condition: null,
+  conditionSetOn: null,
 };
 
 const load = (): GardenState => {
@@ -580,9 +613,22 @@ export function useGarden() {
     });
   }, []);
 
+  const setCondition = useCallback((mode: ConditionMode) => {
+    setState((s) => ({
+      ...s,
+      condition: mode,
+      conditionSetOn: todayStr(),
+    }));
+  }, []);
+
+  // 오늘 컨디션이 설정됐는지 여부 (날짜 기준 자동 초기화)
+  const todayCondition: ConditionMode | null =
+    state.conditionSetOn === todayStr() ? state.condition : null;
+
   return {
     state,
     hydrated,
+    todayCondition,
     addTask,
     toggleTask,
     deleteTask,
@@ -598,5 +644,6 @@ export function useGarden() {
     deleteProject,
     reorderProjects,
     toggleProject,
+    setCondition,
   };
 }
