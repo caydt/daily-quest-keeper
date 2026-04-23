@@ -5,6 +5,7 @@ import { StatHeader } from "@/components/garden/StatHeader";
 import { TaskList } from "@/components/garden/TaskList";
 import { SidePanels } from "@/components/garden/SidePanels";
 import { LevelBar } from "@/components/garden/LevelBar";
+import { ProjectList } from "@/components/garden/ProjectList";
 import { Settings as SettingsIcon, BarChart3 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -35,6 +36,9 @@ function Index() {
     deleteTask,
     postponeTask,
     setNotifications,
+    addProject,
+    toggleProject,
+    deleteProject,
   } = useGarden();
   const today = todayStr();
   const todaysTasks = state.tasks.filter((t) => t.date === today);
@@ -89,13 +93,22 @@ function Index() {
         <LevelBar totalXp={state.totalXp} xp={state.xp} />
 
         <main className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8">
-          <TaskList
-            tasks={todaysTasks}
-            onToggle={toggleTask}
-            onDelete={deleteTask}
-            onPostpone={postponeTask}
-            onAdd={addTask}
-          />
+          <div className="space-y-8 min-w-0">
+            <ProjectList
+              projects={state.projects}
+              totalXp={state.totalXp}
+              onAdd={addProject}
+              onToggle={toggleProject}
+              onDelete={deleteProject}
+            />
+            <TaskList
+              tasks={todaysTasks}
+              onToggle={toggleTask}
+              onDelete={deleteTask}
+              onPostpone={postponeTask}
+              onAdd={addTask}
+            />
+          </div>
           <SidePanels tasks={todaysTasks} streak={state.streak} totalXp={state.totalXp} />
         </main>
 
