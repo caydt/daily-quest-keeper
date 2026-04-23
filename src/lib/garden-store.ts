@@ -15,11 +15,13 @@ export type Task = {
   postponedCount?: number;
   order: number;
   projectId?: string | null; // 프로젝트에 속한 서브태스크
+  toolIds?: string[]; // 첨부된 도구 ID들 (시트 행 ID 또는 name)
 };
 
 export type Settings = {
   morningTime: string; // "HH:MM"
   eveningTime: string;
+  toolsSheetUrl?: string; // 공개 구글 시트 URL (도구 라이브러리)
 };
 
 export type DayLog = {
@@ -39,6 +41,7 @@ export type Project = {
   createdAt: number;
   dueDate?: string; // YYYY-MM-DD optional
   order: number;
+  toolIds?: string[]; // 첨부된 도구 ID들
 };
 
 export type Achievement = {
@@ -467,6 +470,35 @@ export function useGarden() {
     }));
   }, []);
 
+  // 도구 첨부/해제
+  const toggleTaskTool = useCallback((taskId: string, toolId: string) => {
+    setState((s) => ({
+      ...s,
+      tasks: s.tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        const cur = t.toolIds ?? [];
+        return {
+          ...t,
+          toolIds: cur.includes(toolId) ? cur.filter((x) => x !== toolId) : [...cur, toolId],
+        };
+      }),
+    }));
+  }, []);
+
+  const toggleProjectTool = useCallback((projectId: string, toolId: string) => {
+    setState((s) => ({
+      ...s,
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const cur = p.toolIds ?? [];
+        return {
+          ...p,
+          toolIds: cur.includes(toolId) ? cur.filter((x) => x !== toolId) : [...cur, toolId],
+        };
+      }),
+    }));
+  }, []);
+
   const setNotifications = useCallback((enabled: boolean) => {
     setState((s) => ({ ...s, notificationsEnabled: enabled }));
   }, []);
@@ -558,6 +590,8 @@ export function useGarden() {
     reorderTasks,
     assignTaskToProject,
     moveTaskToDate,
+    toggleTaskTool,
+    toggleProjectTool,
     setNotifications,
     updateSettings,
     addProject,
