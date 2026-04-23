@@ -200,7 +200,8 @@ export function ProjectList({
   const [dueDate, setDueDate] = useState("");
   const [open, setOpen] = useState(false);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  // onReorder is consumed by the parent DndContext; keep a no-op reference to avoid lint
+  void onReorder;
 
   const { level, currentXp, nextXp } = levelFromXp(totalXp);
   const rewardXp = Math.max(1, nextXp - currentXp);
@@ -212,16 +213,6 @@ export function ProjectList({
     if (ao !== bo) return ao - bo;
     return b.createdAt - a.createdAt;
   });
-
-  const handleDragEnd = (e: DragEndEvent) => {
-    const { active, over } = e;
-    if (!over || active.id === over.id) return;
-    const ids = sorted.map((p) => p.id);
-    const oldIdx = ids.indexOf(String(active.id));
-    const newIdx = ids.indexOf(String(over.id));
-    if (oldIdx === -1 || newIdx === -1) return;
-    onReorder(arrayMove(ids, oldIdx, newIdx));
-  };
 
   return (
     <section className="space-y-4 rounded-3xl border border-accent/20 bg-card/40 p-6">
