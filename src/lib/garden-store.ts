@@ -470,6 +470,35 @@ export function useGarden() {
     }));
   }, []);
 
+  // 도구 첨부/해제
+  const toggleTaskTool = useCallback((taskId: string, toolId: string) => {
+    setState((s) => ({
+      ...s,
+      tasks: s.tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        const cur = t.toolIds ?? [];
+        return {
+          ...t,
+          toolIds: cur.includes(toolId) ? cur.filter((x) => x !== toolId) : [...cur, toolId],
+        };
+      }),
+    }));
+  }, []);
+
+  const toggleProjectTool = useCallback((projectId: string, toolId: string) => {
+    setState((s) => ({
+      ...s,
+      projects: s.projects.map((p) => {
+        if (p.id !== projectId) return p;
+        const cur = p.toolIds ?? [];
+        return {
+          ...p,
+          toolIds: cur.includes(toolId) ? cur.filter((x) => x !== toolId) : [...cur, toolId],
+        };
+      }),
+    }));
+  }, []);
+
   const setNotifications = useCallback((enabled: boolean) => {
     setState((s) => ({ ...s, notificationsEnabled: enabled }));
   }, []);
