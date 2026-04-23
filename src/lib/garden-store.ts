@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import type { Tool } from "@/lib/tools-sheet";
 
 export type TaskKind = "must" | "flex"; // must = 당일 필수(벌점), flex = 연기 가능(벌점 없음)
 
@@ -80,6 +81,7 @@ export type GardenState = {
   achievements: Record<string, number>; // id -> unlockedAt timestamp
   condition: ConditionMode | null;     // 오늘 컨디션 (null = 아직 미선택)
   conditionSetOn: string | null;       // YYYY-MM-DD: 언제 설정했는지
+  localTools: Tool[];                  // 앱 안에서 직접 등록한 도구들
 };
 
 // 컨디션에 따라 오늘 태스크를 필터링
@@ -168,6 +170,7 @@ const initial: GardenState = {
   achievements: {},
   condition: null,
   conditionSetOn: null,
+  localTools: [],
 };
 
 const load = (): GardenState => {
@@ -206,6 +209,7 @@ const load = (): GardenState => {
       history: parsed.history || [],
       projects: parsed.projects || [],
       achievements: parsed.achievements || {},
+      localTools: parsed.localTools || [],
     };
   } catch {
     return initial;
@@ -613,6 +617,44 @@ export function useGarden() {
     });
   }, []);
 
+  // ====== Local Tools CRUD ======
+  const addLocalTool = useCallback(
+    (tool: Omit<Tool, "id" | "tags"> & { tags?: string[] }) => {
+      setState((s) => ({
+        ...s,
+        localTools: [
+          ...s.localTools,
+          {
+            ...tool,
+            id: `local-${crypto.randomUUID()}`,
+            tags: tool.tags ?? [],
+          },
+        ],
+      }));
+    },
+    [],
+  );
+
+  const updateLocalTool = useCallback((id: string, patch: Partial<Omit<Tool, "id">>) => {
+    setState((s) => ({
+      ...s,
+      localTools: s.localTools.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+    }));
+  }, []);
+
+  const deleteLocalTool = useCallback((id: string) => {
+    setState((s) => ({
+      ...s,
+      localTools: s.localTools.filter((t) => t.id !== id),
+      // 연결된 할일/프로젝트에서도 제거
+      tasks: s.tasks.map((t) => ({ ...t, toolIds: (t.toolIds ?? []).filter((x) => x !== id) })),
+      projects: s.projects.map((p) => ({
+        ...p,
+        toolIds: (p.toolIds ?? []).filter((x) => x !== id),
+      })),
+    }));
+  }, []);
+
   const setCondition = useCallback((mode: ConditionMode) => {
     setState((s) => ({
       ...s,
@@ -645,5 +687,8 @@ export function useGarden() {
     reorderProjects,
     toggleProject,
     setCondition,
+    addLocalTool,
+    updateLocalTool,
+    deleteLocalTool,
   };
 }
