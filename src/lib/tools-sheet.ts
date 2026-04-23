@@ -81,6 +81,21 @@ function parseCsv(text: string): string[][] {
   return rows.filter((r) => r.some((c) => c.trim().length > 0));
 }
 
+// URL 정규화: 보이지 않는 유니코드(BOM, zero-width space 등) 제거 + 스킴 보정
+function normalizeUrl(raw: string): string {
+  if (!raw) return "";
+  // 제로폭/방향 제어 문자 + BOM 제거, 양쪽 공백 trim
+  let u = raw
+    .replace(/[\u200B-\u200D\u2060\uFEFF\u202A-\u202E\u2066-\u2069]/g, "")
+    .trim();
+  if (!u) return "";
+  // 스킴이 없으면 https:// 자동 부여 (단, mailto: tel: 제외)
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(u)) {
+    u = `https://${u}`;
+  }
+  return u;
+}
+
 function rowsToTools(rows: string[][]): Tool[] {
   if (rows.length === 0) return [];
   const headers = rows[0].map((h) => h.trim().toLowerCase());
@@ -96,7 +111,8 @@ function rowsToTools(rows: string[][]): Tool[] {
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
     const name = (iName >= 0 ? row[iName] : row[0])?.trim() ?? "";
-    const url = (iUrl >= 0 ? row[iUrl] : row[1])?.trim() ?? "";
+    const rawUrl = (iUrl >= 0 ? row[iUrl] : row[1]) ?? "";
+    const url = normalizeUrl(rawUrl);
     if (!name || !url) continue;
     tools.push({
       id: `row-${r}-${name.toLowerCase().replace(/\s+/g, "-")}`,
