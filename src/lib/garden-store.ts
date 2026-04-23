@@ -41,6 +41,7 @@ export type Project = {
   createdAt: number;
   dueDate?: string; // YYYY-MM-DD optional
   order: number;
+  toolIds?: string[]; // 첨부된 도구 ID들
 };
 
 export type Achievement = {
