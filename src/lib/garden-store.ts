@@ -590,6 +590,8 @@ export function useGarden() {
     reorderTasks,
     assignTaskToProject,
     moveTaskToDate,
+    toggleTaskTool,
+    toggleProjectTool,
     setNotifications,
     updateSettings,
     addProject,
