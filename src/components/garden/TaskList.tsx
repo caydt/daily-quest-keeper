@@ -40,14 +40,12 @@ function TaskRow({
   onDelete,
   onPostpone,
   burstId,
-  isOverlay,
 }: {
   t: Task;
   onToggle: (t: Task) => void;
   onDelete: (id: string) => void;
   onPostpone: (id: string) => void;
   burstId: string | null;
-  isOverlay?: boolean;
 }) {
   const sortable = useSortable({ id: t.id, data: { type: "task", task: t } });
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = sortable;
@@ -57,20 +55,20 @@ function TaskRow({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging && !isOverlay ? 0.4 : 1,
+    opacity: isDragging ? 0.4 : 1,
   };
 
   return (
     <div
-      ref={isOverlay ? undefined : setNodeRef}
-      style={isOverlay ? undefined : style}
+      ref={setNodeRef}
+      style={style}
       className={`group relative flex items-center gap-3 p-4 rounded-2xl border transition-all ${
         t.completed
           ? "bg-card/30 border-white/5 opacity-60"
           : isFlex
             ? "bg-card border-primary/15 hover:border-primary/40"
             : "bg-card border-white/10 hover:border-accent/40"
-      } ${isOverlay ? "shadow-bloom ring-2 ring-primary/40" : ""}`}
+      }`}
     >
       {/* Drag handle */}
       <button

@@ -218,5 +218,3 @@ function Index() {
     </div>
   );
 }
-{/* activeId reserved for future drag overlay */}
-{void 0}
