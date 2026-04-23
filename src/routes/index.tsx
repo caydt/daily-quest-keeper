@@ -8,7 +8,7 @@ import { ProjectList } from "@/components/garden/ProjectList";
 import { QuestPanel } from "@/components/garden/QuestPanel";
 import { AchievementCodex } from "@/components/garden/AchievementCodex";
 import { SidePanels } from "@/components/garden/SidePanels";
-import { Settings as SettingsIcon, BarChart3, Bell, BellOff } from "lucide-react";
+import { Settings as SettingsIcon, BarChart3, Bell, BellOff, Wrench } from "lucide-react";
 import {
   DndContext,
   PointerSensor,
@@ -151,6 +151,12 @@ function Index() {
                 <BellOff className="size-4 text-muted-foreground" />
               )}
             </button>
+            <Link
+              to="/tools"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 bg-card/60 hover:border-primary/40 text-xs font-medium text-muted-foreground hover:text-primary transition"
+            >
+              <Wrench className="size-3.5" /> <span className="hidden sm:inline">도구</span>
+            </Link>
             <Link
               to="/review"
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 bg-card/60 hover:border-primary/40 text-xs font-medium text-muted-foreground hover:text-primary transition"
