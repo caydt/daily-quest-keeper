@@ -297,28 +297,26 @@ export function ProjectList({
         </form>
       )}
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={sorted.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-2.5">
-            {sorted.length === 0 && (
-              <p className="text-center text-muted-foreground text-sm py-8">
-                아직 보스가 없어요. 큰 목표 하나를 소환해보세요 🏆
-              </p>
-            )}
-            {sorted.map((p) => (
-              <ProjectCard
-                key={p.id}
-                p={p}
-                childTasks={tasks.filter((t) => t.projectId === p.id)}
-                rewardXp={rewardXp}
-                onToggle={onToggle}
-                onDelete={onDelete}
-                onUnassign={(taskId) => onAssignTask(taskId, null)}
-              />
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
+      <SortableContext items={sorted.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+        <div className="space-y-2.5">
+          {sorted.length === 0 && (
+            <p className="text-center text-muted-foreground text-sm py-8">
+              아직 보스가 없어요. 큰 목표 하나를 소환해보세요 🏆
+            </p>
+          )}
+          {sorted.map((p) => (
+            <ProjectCard
+              key={p.id}
+              p={p}
+              childTasks={tasks.filter((t) => t.projectId === p.id)}
+              rewardXp={rewardXp}
+              onToggle={onToggle}
+              onDelete={onDelete}
+              onUnassign={(taskId) => onAssignTask(taskId, null)}
+            />
+          ))}
+        </div>
+      </SortableContext>
     </section>
   );
 }
