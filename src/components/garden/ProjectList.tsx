@@ -2,19 +2,12 @@ import { useState } from "react";
 import type { Project, Task } from "@/lib/garden-store";
 import { levelFromXp } from "@/lib/garden-store";
 import {
-  DndContext,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
   useDroppable,
-  type DragEndEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
   verticalListSortingStrategy,
   useSortable,
-  arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
