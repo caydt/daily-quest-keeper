@@ -13,6 +13,8 @@ export type Task = {
   createdAt: number;
   date: string; // YYYY-MM-DD (현재 예정일)
   postponedCount?: number;
+  order: number;
+  projectId?: string | null; // 프로젝트에 속한 서브태스크
 };
 
 export type Settings = {
@@ -36,24 +38,54 @@ export type Project = {
   completedAt?: number;
   createdAt: number;
   dueDate?: string; // YYYY-MM-DD optional
+  order: number;
+};
+
+export type Achievement = {
+  id: string;
+  label: string;
+  desc: string;
+  icon: string; // emoji
+  unlockedAt?: number;
 };
 
 export type GardenState = {
   xp: number;
   totalXp: number;
   streak: number;
+  combo: number; // 연속 완료 콤보
+  lastCompletedAt?: number;
+  dailyBonusGivenOn?: string; // YYYY-MM-DD: 그 날 일일 보너스 받았는지
   lastActiveDate: string | null;
   tasks: Task[];
   projects: Project[];
   notificationsEnabled: boolean;
   settings: Settings;
   history: DayLog[];
+  achievements: Record<string, number>; // id -> unlockedAt timestamp
 };
 
-const STORAGE_KEY = "lumi-garden-v2";
+const STORAGE_KEY = "lumi-garden-v3";
 
 export const XP_REWARD = { easy: 20, medium: 45, hard: 80 } as const;
 export const XP_PENALTY = { easy: 10, medium: 20, hard: 35 } as const;
+export const DAILY_CLEAR_BONUS = 75; // 모든 일반 할일 완료 시
+export const COMBO_WINDOW_MS = 1000 * 60 * 30; // 30분 내 연속이면 콤보 유지
+
+export const ACHIEVEMENTS: Omit<Achievement, "unlockedAt">[] = [
+  { id: "first_bloom", label: "첫 개화", desc: "첫 할일 완료", icon: "🌱" },
+  { id: "daily_clear", label: "퍼펙트 데이", desc: "하루 모든 할일 완료", icon: "🏵️" },
+  { id: "streak_3", label: "삼일 연승", desc: "3일 연속 완료", icon: "🔥" },
+  { id: "streak_7", label: "주간 정원사", desc: "7일 연속", icon: "👑" },
+  { id: "combo_5", label: "콤보 마스터", desc: "5콤보 달성", icon: "⚡" },
+  { id: "combo_10", label: "전설의 손길", desc: "10콤보 달성", icon: "💫" },
+  { id: "project_clear", label: "수확의 기쁨", desc: "프로젝트 1개 완료", icon: "🏆" },
+  { id: "project_5", label: "위대한 정원", desc: "프로젝트 5개 완료", icon: "🌳" },
+  { id: "level_5", label: "성숙한 정원", desc: "레벨 5 달성", icon: "🌟" },
+  { id: "level_10", label: "전설의 정원", desc: "레벨 10 달성", icon: "💎" },
+  { id: "no_wither", label: "무결점", desc: "벌점 없이 하루 완주", icon: "🛡️" },
+  { id: "early_bird", label: "새벽 정원사", desc: "오전 7시 전 완료", icon: "🌅" },
+];
 
 export const todayStr = () => {
   const d = new Date();
@@ -79,16 +111,27 @@ export const levelFromXp = (xp: number) => {
   return { level, currentXp: remaining, nextXp: need };
 };
 
+// 정원 캐릭터 진화 단계
+export const stageFromLevel = (level: number): { name: string; icon: string; tier: number } => {
+  if (level >= 15) return { name: "고대 거목", icon: "🌳", tier: 5 };
+  if (level >= 10) return { name: "만개한 정원수", icon: "🌸", tier: 4 };
+  if (level >= 6) return { name: "꽃 피우는 새싹", icon: "🌷", tier: 3 };
+  if (level >= 3) return { name: "어린 새싹", icon: "🌿", tier: 2 };
+  return { name: "씨앗", icon: "🌱", tier: 1 };
+};
+
 const initial: GardenState = {
   xp: 0,
   totalXp: 0,
   streak: 0,
+  combo: 0,
   lastActiveDate: null,
   tasks: [],
   projects: [],
   notificationsEnabled: false,
   settings: { morningTime: "08:00", eveningTime: "21:00" },
   history: [],
+  achievements: {},
 };
 
 const load = (): GardenState => {
@@ -96,18 +139,26 @@ const load = (): GardenState => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      // migrate from v1 if exists
-      const v1 = localStorage.getItem("lumi-garden-v1");
-      if (v1) {
-        const old = JSON.parse(v1);
-        const migrated = {
+      // migrate from v2
+      const v2 = localStorage.getItem("lumi-garden-v2");
+      if (v2) {
+        const old = JSON.parse(v2);
+        return {
           ...initial,
           ...old,
-          tasks: (old.tasks || []).map((t: any) => ({ ...t, kind: t.kind ?? "must" })),
-          settings: initial.settings,
-          history: [],
+          tasks: (old.tasks || []).map((t: any, i: number) => ({
+            ...t,
+            kind: t.kind ?? "must",
+            order: t.order ?? i,
+            projectId: t.projectId ?? null,
+          })),
+          projects: (old.projects || []).map((p: any, i: number) => ({
+            ...p,
+            order: p.order ?? i,
+          })),
+          achievements: old.achievements || {},
+          combo: 0,
         };
-        return migrated;
       }
       return initial;
     }
@@ -118,6 +169,7 @@ const load = (): GardenState => {
       settings: { ...initial.settings, ...(parsed.settings || {}) },
       history: parsed.history || [],
       projects: parsed.projects || [],
+      achievements: parsed.achievements || {},
     };
   } catch {
     return initial;
@@ -130,6 +182,38 @@ const save = (s: GardenState) => {
   } catch {
     /* ignore */
   }
+};
+
+const checkAchievements = (s: GardenState, ctx: { event?: string }): GardenState => {
+  const ach = { ...s.achievements };
+  const now = Date.now();
+  const grant = (id: string) => {
+    if (!ach[id]) ach[id] = now;
+  };
+
+  if (s.totalXp > 0) grant("first_bloom");
+  const { level } = levelFromXp(s.totalXp);
+  if (level >= 5) grant("level_5");
+  if (level >= 10) grant("level_10");
+  if (s.streak >= 3) grant("streak_3");
+  if (s.streak >= 7) grant("streak_7");
+  if (s.combo >= 5) grant("combo_5");
+  if (s.combo >= 10) grant("combo_10");
+
+  const completedProjects = s.projects.filter((p) => p.completed).length;
+  if (completedProjects >= 1) grant("project_clear");
+  if (completedProjects >= 5) grant("project_5");
+
+  const today = todayStr();
+  const todays = s.tasks.filter((t) => t.date === today);
+  if (todays.length > 0 && todays.every((t) => t.completed)) grant("daily_clear");
+
+  if (ctx.event === "complete") {
+    const h = new Date().getHours();
+    if (h < 7) grant("early_bird");
+  }
+
+  return { ...s, achievements: ach };
 };
 
 export function useGarden() {
@@ -145,7 +229,7 @@ export function useGarden() {
     if (hydrated) save(state);
   }, [state, hydrated]);
 
-  // 일일 정산: 어제까지의 'must' 미완료에만 벌점, 'flex'는 그대로 다음 날로 이월
+  // 일일 정산
   useEffect(() => {
     if (!hydrated) return;
     const today = todayStr();
@@ -165,10 +249,8 @@ export function useGarden() {
           newTasks.push(t);
           continue;
         }
-        // 미완료 + 과거
         if (t.kind === "must") {
           penalty += XP_PENALTY[t.difficulty];
-          // 기록만 남기고 제거 (시들었음)
           const log = (logsByDate[t.date] ??= {
             date: t.date,
             completed: 0,
@@ -179,7 +261,6 @@ export function useGarden() {
           log.total += 1;
           log.xpLost += XP_PENALTY[t.difficulty];
         } else {
-          // flex: 오늘로 이월
           newTasks.push({
             ...t,
             date: today,
@@ -188,7 +269,6 @@ export function useGarden() {
         }
       }
 
-      // 어제 완료 여부로 streak 갱신
       const yStr = addDays(today, -1);
       const completedYesterday = prev.tasks.some((t) => t.date === yStr && t.completed);
       const newStreak = completedYesterday ? prev.streak : 0;
@@ -212,6 +292,7 @@ export function useGarden() {
         tasks: newTasks,
         xp: Math.max(0, prev.xp - penalty),
         streak: newStreak,
+        combo: 0,
         lastActiveDate: today,
         history: newHistory.slice(-60),
       };
@@ -234,6 +315,8 @@ export function useGarden() {
             createdAt: Date.now(),
             date: todayStr(),
             postponedCount: 0,
+            order: s.tasks.length,
+            projectId: null,
           },
         ],
       }));
@@ -269,29 +352,76 @@ export function useGarden() {
       const task = s.tasks.find((t) => t.id === id);
       if (!task) return s;
       const wasCompleted = task.completed;
-      const reward = XP_REWARD[task.difficulty];
+      const baseReward = XP_REWARD[task.difficulty];
       const today = todayStr();
+      const now = Date.now();
+
+      // 콤보 계산
+      let combo = s.combo;
+      if (!wasCompleted) {
+        if (s.lastCompletedAt && now - s.lastCompletedAt < COMBO_WINDOW_MS) {
+          combo = s.combo + 1;
+        } else {
+          combo = 1;
+        }
+      } else {
+        combo = Math.max(0, s.combo - 1);
+      }
+
+      // 콤보 보너스 배율: 5콤보부터 1.5배, 10콤보부터 2배
+      const multiplier = !wasCompleted ? (combo >= 10 ? 2 : combo >= 5 ? 1.5 : 1) : 1;
+      const reward = Math.round(baseReward * multiplier);
 
       const tasks = s.tasks.map((t) =>
         t.id === id
-          ? { ...t, completed: !t.completed, completedAt: !t.completed ? Date.now() : undefined }
+          ? { ...t, completed: !t.completed, completedAt: !t.completed ? now : undefined }
           : t,
       );
 
-      const xpDelta = wasCompleted ? -reward : reward;
-      const newXp = Math.max(0, s.xp + xpDelta);
-      const newTotal = Math.max(0, s.totalXp + (wasCompleted ? -reward : reward));
+      let xpDelta = wasCompleted ? -reward : reward;
+      let newTotal = Math.max(0, s.totalXp + xpDelta);
+      let newXp = Math.max(0, s.xp + xpDelta);
 
       const completedTodayBefore = s.tasks.some((t) => t.date === today && t.completed);
       let streak = s.streak;
       if (!wasCompleted && !completedTodayBefore) streak = s.streak + 1;
 
+      // 일일 보너스: 오늘 모든 일반 할일(프로젝트 외)이 완료되면 부여
+      let dailyBonusGivenOn = s.dailyBonusGivenOn;
+      const todaysTasks = tasks.filter((t) => t.date === today);
+      const allDone = todaysTasks.length > 0 && todaysTasks.every((t) => t.completed);
+      let bonusDelta = 0;
+      if (!wasCompleted && allDone && dailyBonusGivenOn !== today) {
+        bonusDelta = DAILY_CLEAR_BONUS;
+        dailyBonusGivenOn = today;
+        newXp += bonusDelta;
+        newTotal += bonusDelta;
+      }
+      // 보너스를 회수해야 하는 경우 (완료 해제로 더 이상 all done이 아닌데 오늘 보너스 받았던 경우)
+      if (wasCompleted && dailyBonusGivenOn === today && !allDone) {
+        bonusDelta = -DAILY_CLEAR_BONUS;
+        dailyBonusGivenOn = undefined;
+        newXp = Math.max(0, newXp + bonusDelta);
+        newTotal = Math.max(0, newTotal + bonusDelta);
+      }
+
       const history = recordHistory(s, today, {
         completed: wasCompleted ? -1 : 1,
-        xpGained: wasCompleted ? -reward : reward,
+        xpGained: xpDelta + bonusDelta,
       });
 
-      return { ...s, tasks, xp: newXp, totalXp: newTotal, streak, history };
+      const next: GardenState = {
+        ...s,
+        tasks,
+        xp: newXp,
+        totalXp: newTotal,
+        streak,
+        combo,
+        lastCompletedAt: !wasCompleted ? now : s.lastCompletedAt,
+        dailyBonusGivenOn,
+        history,
+      };
+      return checkAchievements(next, { event: !wasCompleted ? "complete" : "uncomplete" });
     });
   }, []);
 
@@ -307,6 +437,33 @@ export function useGarden() {
           ? { ...t, date: addDays(t.date, 1), postponedCount: (t.postponedCount ?? 0) + 1 }
           : t,
       ),
+    }));
+  }, []);
+
+  // 할일 순서 재정렬
+  const reorderTasks = useCallback((orderedIds: string[]) => {
+    setState((s) => {
+      const map = new Map(orderedIds.map((id, i) => [id, i]));
+      return {
+        ...s,
+        tasks: s.tasks.map((t) => (map.has(t.id) ? { ...t, order: map.get(t.id)! } : t)),
+      };
+    });
+  }, []);
+
+  // 할일을 프로젝트로 이동 (또는 해제)
+  const assignTaskToProject = useCallback((taskId: string, projectId: string | null) => {
+    setState((s) => ({
+      ...s,
+      tasks: s.tasks.map((t) => (t.id === taskId ? { ...t, projectId } : t)),
+    }));
+  }, []);
+
+  // 할일 날짜 변경
+  const moveTaskToDate = useCallback((taskId: string, date: string) => {
+    setState((s) => ({
+      ...s,
+      tasks: s.tasks.map((t) => (t.id === taskId ? { ...t, date } : t)),
     }));
   }, []);
 
@@ -331,16 +488,33 @@ export function useGarden() {
           dueDate,
           completed: false,
           createdAt: Date.now(),
+          order: s.projects.length,
         },
       ],
     }));
   }, []);
 
   const deleteProject = useCallback((id: string) => {
-    setState((s) => ({ ...s, projects: s.projects.filter((p) => p.id !== id) }));
+    setState((s) => ({
+      ...s,
+      projects: s.projects.filter((p) => p.id !== id),
+      // 해당 프로젝트의 서브태스크는 해제
+      tasks: s.tasks.map((t) => (t.projectId === id ? { ...t, projectId: null } : t)),
+    }));
   }, []);
 
-  // 프로젝트 완료 = 무조건 +1 레벨. 현재 레벨에 남은 XP만큼 보상.
+  const reorderProjects = useCallback((orderedIds: string[]) => {
+    setState((s) => {
+      const map = new Map(orderedIds.map((id, i) => [id, i]));
+      return {
+        ...s,
+        projects: s.projects.map((p) =>
+          map.has(p.id) ? { ...p, order: map.get(p.id)! } : p,
+        ),
+      };
+    });
+  }, []);
+
   const toggleProject = useCallback((id: string) => {
     setState((s) => {
       const project = s.projects.find((p) => p.id === id);
@@ -348,9 +522,8 @@ export function useGarden() {
       const wasCompleted = project.completed;
       const today = todayStr();
 
-      // 현재 레벨 기준으로 다음 레벨까지 필요한 XP 계산
       const { currentXp, nextXp } = levelFromXp(s.totalXp);
-      const reward = Math.max(1, nextXp - currentXp); // 정확히 1레벨업 보장
+      const reward = Math.max(1, nextXp - currentXp);
 
       const projects = s.projects.map((p) =>
         p.id === id
@@ -358,16 +531,20 @@ export function useGarden() {
           : p,
       );
 
-      // 완료 → 보상, 완료 해제 → 회수(같은 양)
       const delta = wasCompleted ? -reward : reward;
       const newXp = Math.max(0, s.xp + delta);
       const newTotal = Math.max(0, s.totalXp + delta);
 
-      const history = recordHistory(s, today, {
-        xpGained: delta,
-      });
+      const history = recordHistory(s, today, { xpGained: delta });
 
-      return { ...s, projects, xp: newXp, totalXp: newTotal, history };
+      const next: GardenState = {
+        ...s,
+        projects,
+        xp: newXp,
+        totalXp: newTotal,
+        history,
+      };
+      return checkAchievements(next, {});
     });
   }, []);
 
@@ -378,10 +555,14 @@ export function useGarden() {
     toggleTask,
     deleteTask,
     postponeTask,
+    reorderTasks,
+    assignTaskToProject,
+    moveTaskToDate,
     setNotifications,
     updateSettings,
     addProject,
     deleteProject,
+    reorderProjects,
     toggleProject,
   };
 }
