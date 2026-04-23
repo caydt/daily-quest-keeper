@@ -10,6 +10,7 @@ import {
   Wrench,
   Plus,
   Check,
+  Copy,
   Settings as SettingsIcon,
 } from "lucide-react";
 
