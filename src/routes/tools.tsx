@@ -253,6 +253,23 @@ function ToolsPage() {
                           <ExternalLink className="size-3.5" /> 열기
                         </a>
                         <button
+                          onClick={() => copyUrl(tool.id, tool.url)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs transition ${
+                            copiedId === tool.id
+                              ? "border-primary/40 text-primary bg-primary/10"
+                              : "border-white/10 text-muted-foreground hover:border-primary/30"
+                          }`}
+                          title="링크 복사"
+                        >
+                          {copiedId === tool.id ? (
+                            <>
+                              <Check className="size-3.5" /> 복사됨
+                            </>
+                          ) : (
+                            <Copy className="size-3.5" />
+                          )}
+                        </button>
+                        <button
                           onClick={() =>
                             setAttachOpenFor(attachOpenFor === tool.id ? null : tool.id)
                           }
