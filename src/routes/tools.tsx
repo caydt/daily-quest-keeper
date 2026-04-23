@@ -10,6 +10,7 @@ import {
   Wrench,
   Plus,
   Check,
+  Copy,
   Settings as SettingsIcon,
 } from "lucide-react";
 
@@ -34,6 +35,29 @@ function ToolsPage() {
   const [q, setQ] = useState("");
   const [activeCat, setActiveCat] = useState<string | null>(null);
   const [attachOpenFor, setAttachOpenFor] = useState<string | null>(null); // toolId
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyUrl = async (id: string, url: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        // 폴백: 임시 textarea
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopiedId(id);
+      setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1500);
+    } catch {
+      window.prompt("링크 복사 (Ctrl/Cmd+C)", url);
+    }
+  };
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -228,6 +252,23 @@ function ToolsPage() {
                         >
                           <ExternalLink className="size-3.5" /> 열기
                         </a>
+                        <button
+                          onClick={() => copyUrl(tool.id, tool.url)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs transition ${
+                            copiedId === tool.id
+                              ? "border-primary/40 text-primary bg-primary/10"
+                              : "border-white/10 text-muted-foreground hover:border-primary/30"
+                          }`}
+                          title="링크 복사"
+                        >
+                          {copiedId === tool.id ? (
+                            <>
+                              <Check className="size-3.5" /> 복사됨
+                            </>
+                          ) : (
+                            <Copy className="size-3.5" />
+                          )}
+                        </button>
                         <button
                           onClick={() =>
                             setAttachOpenFor(attachOpenFor === tool.id ? null : tool.id)
