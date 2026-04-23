@@ -111,7 +111,8 @@ function rowsToTools(rows: string[][]): Tool[] {
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
     const name = (iName >= 0 ? row[iName] : row[0])?.trim() ?? "";
-    const url = (iUrl >= 0 ? row[iUrl] : row[1])?.trim() ?? "";
+    const rawUrl = (iUrl >= 0 ? row[iUrl] : row[1]) ?? "";
+    const url = normalizeUrl(rawUrl);
     if (!name || !url) continue;
     tools.push({
       id: `row-${r}-${name.toLowerCase().replace(/\s+/g, "-")}`,
