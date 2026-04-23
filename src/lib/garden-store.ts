@@ -28,12 +28,23 @@ export type DayLog = {
   xpLost: number;
 };
 
+export type Project = {
+  id: string;
+  title: string;
+  description?: string;
+  completed: boolean;
+  completedAt?: number;
+  createdAt: number;
+  dueDate?: string; // YYYY-MM-DD optional
+};
+
 export type GardenState = {
   xp: number;
   totalXp: number;
   streak: number;
   lastActiveDate: string | null;
   tasks: Task[];
+  projects: Project[];
   notificationsEnabled: boolean;
   settings: Settings;
   history: DayLog[];
@@ -74,6 +85,7 @@ const initial: GardenState = {
   streak: 0,
   lastActiveDate: null,
   tasks: [],
+  projects: [],
   notificationsEnabled: false,
   settings: { morningTime: "08:00", eveningTime: "21:00" },
   history: [],
@@ -105,6 +117,7 @@ const load = (): GardenState => {
       ...parsed,
       settings: { ...initial.settings, ...(parsed.settings || {}) },
       history: parsed.history || [],
+      projects: parsed.projects || [],
     };
   } catch {
     return initial;
@@ -305,6 +318,59 @@ export function useGarden() {
     setState((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
   }, []);
 
+  // ====== Projects ======
+  const addProject = useCallback((title: string, description?: string, dueDate?: string) => {
+    setState((s) => ({
+      ...s,
+      projects: [
+        ...s.projects,
+        {
+          id: crypto.randomUUID(),
+          title,
+          description,
+          dueDate,
+          completed: false,
+          createdAt: Date.now(),
+        },
+      ],
+    }));
+  }, []);
+
+  const deleteProject = useCallback((id: string) => {
+    setState((s) => ({ ...s, projects: s.projects.filter((p) => p.id !== id) }));
+  }, []);
+
+  // 프로젝트 완료 = 무조건 +1 레벨. 현재 레벨에 남은 XP만큼 보상.
+  const toggleProject = useCallback((id: string) => {
+    setState((s) => {
+      const project = s.projects.find((p) => p.id === id);
+      if (!project) return s;
+      const wasCompleted = project.completed;
+      const today = todayStr();
+
+      // 현재 레벨 기준으로 다음 레벨까지 필요한 XP 계산
+      const { currentXp, nextXp } = levelFromXp(s.totalXp);
+      const reward = Math.max(1, nextXp - currentXp); // 정확히 1레벨업 보장
+
+      const projects = s.projects.map((p) =>
+        p.id === id
+          ? { ...p, completed: !p.completed, completedAt: !p.completed ? Date.now() : undefined }
+          : p,
+      );
+
+      // 완료 → 보상, 완료 해제 → 회수(같은 양)
+      const delta = wasCompleted ? -reward : reward;
+      const newXp = Math.max(0, s.xp + delta);
+      const newTotal = Math.max(0, s.totalXp + delta);
+
+      const history = recordHistory(s, today, {
+        xpGained: delta,
+      });
+
+      return { ...s, projects, xp: newXp, totalXp: newTotal, history };
+    });
+  }, []);
+
   return {
     state,
     hydrated,
@@ -314,5 +380,8 @@ export function useGarden() {
     postponeTask,
     setNotifications,
     updateSettings,
+    addProject,
+    deleteProject,
+    toggleProject,
   };
 }
