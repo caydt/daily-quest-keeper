@@ -1,14 +1,31 @@
 import { useEffect, useState, useCallback } from "react";
 
+export type TaskKind = "must" | "flex"; // must = 당일 필수(벌점), flex = 연기 가능(벌점 없음)
+
 export type Task = {
   id: string;
   title: string;
   time: string; // "HH:MM"
   difficulty: "easy" | "medium" | "hard";
+  kind: TaskKind;
   completed: boolean;
   completedAt?: number;
   createdAt: number;
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD (현재 예정일)
+  postponedCount?: number;
+};
+
+export type Settings = {
+  morningTime: string; // "HH:MM"
+  eveningTime: string;
+};
+
+export type DayLog = {
+  date: string;
+  completed: number;
+  total: number;
+  xpGained: number;
+  xpLost: number;
 };
 
 export type GardenState = {
@@ -18,9 +35,11 @@ export type GardenState = {
   lastActiveDate: string | null;
   tasks: Task[];
   notificationsEnabled: boolean;
+  settings: Settings;
+  history: DayLog[];
 };
 
-const STORAGE_KEY = "lumi-garden-v1";
+const STORAGE_KEY = "lumi-garden-v2";
 
 export const XP_REWARD = { easy: 20, medium: 45, hard: 80 } as const;
 export const XP_PENALTY = { easy: 10, medium: 20, hard: 35 } as const;
@@ -30,8 +49,14 @@ export const todayStr = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
+export const addDays = (dateStr: string, days: number) => {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+};
+
 export const levelFromXp = (xp: number) => {
-  // each level requires (level * 200) xp cumulatively-ish: simple curve
   let level = 1;
   let need = 200;
   let remaining = xp;
@@ -50,14 +75,37 @@ const initial: GardenState = {
   lastActiveDate: null,
   tasks: [],
   notificationsEnabled: false,
+  settings: { morningTime: "08:00", eveningTime: "21:00" },
+  history: [],
 };
 
 const load = (): GardenState => {
   if (typeof window === "undefined") return initial;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return initial;
-    return { ...initial, ...JSON.parse(raw) };
+    if (!raw) {
+      // migrate from v1 if exists
+      const v1 = localStorage.getItem("lumi-garden-v1");
+      if (v1) {
+        const old = JSON.parse(v1);
+        const migrated = {
+          ...initial,
+          ...old,
+          tasks: (old.tasks || []).map((t: any) => ({ ...t, kind: t.kind ?? "must" })),
+          settings: initial.settings,
+          history: [],
+        };
+        return migrated;
+      }
+      return initial;
+    }
+    const parsed = JSON.parse(raw);
+    return {
+      ...initial,
+      ...parsed,
+      settings: { ...initial.settings, ...(parsed.settings || {}) },
+      history: parsed.history || [],
+    };
   } catch {
     return initial;
   }
@@ -84,7 +132,7 @@ export function useGarden() {
     if (hydrated) save(state);
   }, [state, hydrated]);
 
-  // Apply penalties for yesterday's missed tasks once per day
+  // 일일 정산: 어제까지의 'must' 미완료에만 벌점, 'flex'는 그대로 다음 날로 이월
   useEffect(() => {
     if (!hydrated) return;
     const today = todayStr();
@@ -92,36 +140,73 @@ export function useGarden() {
 
     setState((prev) => {
       let penalty = 0;
-      const yesterdayMissed = prev.tasks.filter(
-        (t) => t.date !== today && !t.completed,
-      );
-      for (const t of yesterdayMissed) penalty += XP_PENALTY[t.difficulty];
+      const newTasks: Task[] = [];
+      const logsByDate: Record<string, DayLog> = {};
 
-      // streak logic: if yesterday had completions, streak preserved/incremented
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
-      const completedYesterday = prev.tasks.some(
-        (t) => t.date === yStr && t.completed,
-      );
-      const newStreak =
-        prev.lastActiveDate === yStr && completedYesterday
-          ? prev.streak
-          : completedYesterday
-            ? prev.streak + 0 // already counted
-            : 0;
+      for (const t of prev.tasks) {
+        if (t.completed) {
+          newTasks.push(t);
+          continue;
+        }
+        if (t.date >= today) {
+          newTasks.push(t);
+          continue;
+        }
+        // 미완료 + 과거
+        if (t.kind === "must") {
+          penalty += XP_PENALTY[t.difficulty];
+          // 기록만 남기고 제거 (시들었음)
+          const log = (logsByDate[t.date] ??= {
+            date: t.date,
+            completed: 0,
+            total: 0,
+            xpGained: 0,
+            xpLost: 0,
+          });
+          log.total += 1;
+          log.xpLost += XP_PENALTY[t.difficulty];
+        } else {
+          // flex: 오늘로 이월
+          newTasks.push({
+            ...t,
+            date: today,
+            postponedCount: (t.postponedCount ?? 0) + 1,
+          });
+        }
+      }
+
+      // 어제 완료 여부로 streak 갱신
+      const yStr = addDays(today, -1);
+      const completedYesterday = prev.tasks.some((t) => t.date === yStr && t.completed);
+      const newStreak = completedYesterday ? prev.streak : 0;
+
+      const newHistory = [...prev.history];
+      for (const log of Object.values(logsByDate)) {
+        const idx = newHistory.findIndex((h) => h.date === log.date);
+        if (idx >= 0) {
+          newHistory[idx] = {
+            ...newHistory[idx],
+            total: newHistory[idx].total + log.total,
+            xpLost: newHistory[idx].xpLost + log.xpLost,
+          };
+        } else {
+          newHistory.push(log);
+        }
+      }
 
       return {
         ...prev,
+        tasks: newTasks,
         xp: Math.max(0, prev.xp - penalty),
         streak: newStreak,
         lastActiveDate: today,
+        history: newHistory.slice(-60),
       };
     });
   }, [hydrated, state.lastActiveDate, state.tasks]);
 
   const addTask = useCallback(
-    (title: string, time: string, difficulty: Task["difficulty"]) => {
+    (title: string, time: string, difficulty: Task["difficulty"], kind: TaskKind) => {
       setState((s) => ({
         ...s,
         tasks: [
@@ -131,15 +216,40 @@ export function useGarden() {
             title,
             time,
             difficulty,
+            kind,
             completed: false,
             createdAt: Date.now(),
             date: todayStr(),
+            postponedCount: 0,
           },
         ],
       }));
     },
     [],
   );
+
+  const recordHistory = (state: GardenState, date: string, patch: Partial<DayLog>) => {
+    const history = [...state.history];
+    const idx = history.findIndex((h) => h.date === date);
+    if (idx >= 0) {
+      history[idx] = {
+        ...history[idx],
+        completed: history[idx].completed + (patch.completed ?? 0),
+        total: history[idx].total + (patch.total ?? 0),
+        xpGained: history[idx].xpGained + (patch.xpGained ?? 0),
+        xpLost: history[idx].xpLost + (patch.xpLost ?? 0),
+      };
+    } else {
+      history.push({
+        date,
+        completed: patch.completed ?? 0,
+        total: patch.total ?? 0,
+        xpGained: patch.xpGained ?? 0,
+        xpLost: patch.xpLost ?? 0,
+      });
+    }
+    return history.slice(-60);
+  };
 
   const toggleTask = useCallback((id: string) => {
     setState((s) => {
@@ -157,16 +267,18 @@ export function useGarden() {
 
       const xpDelta = wasCompleted ? -reward : reward;
       const newXp = Math.max(0, s.xp + xpDelta);
-      const newTotal = Math.max(0, s.totalXp + (wasCompleted ? 0 : reward));
+      const newTotal = Math.max(0, s.totalXp + (wasCompleted ? -reward : reward));
 
-      // Update streak when first completion of today
-      const completedToday = tasks.some((t) => t.date === today && t.completed);
-      const streak =
-        !wasCompleted && completedToday && s.lastActiveDate !== today + ":streak"
-          ? Math.max(s.streak, s.streak + (s.tasks.some((t) => t.date === today && t.completed) ? 0 : 1))
-          : s.streak;
+      const completedTodayBefore = s.tasks.some((t) => t.date === today && t.completed);
+      let streak = s.streak;
+      if (!wasCompleted && !completedTodayBefore) streak = s.streak + 1;
 
-      return { ...s, tasks, xp: newXp, totalXp: newTotal, streak };
+      const history = recordHistory(s, today, {
+        completed: wasCompleted ? -1 : 1,
+        xpGained: wasCompleted ? -reward : reward,
+      });
+
+      return { ...s, tasks, xp: newXp, totalXp: newTotal, streak, history };
     });
   }, []);
 
@@ -174,8 +286,23 @@ export function useGarden() {
     setState((s) => ({ ...s, tasks: s.tasks.filter((t) => t.id !== id) }));
   }, []);
 
+  const postponeTask = useCallback((id: string) => {
+    setState((s) => ({
+      ...s,
+      tasks: s.tasks.map((t) =>
+        t.id === id && t.kind === "flex"
+          ? { ...t, date: addDays(t.date, 1), postponedCount: (t.postponedCount ?? 0) + 1 }
+          : t,
+      ),
+    }));
+  }, []);
+
   const setNotifications = useCallback((enabled: boolean) => {
     setState((s) => ({ ...s, notificationsEnabled: enabled }));
+  }, []);
+
+  const updateSettings = useCallback((patch: Partial<Settings>) => {
+    setState((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
   }, []);
 
   return {
@@ -184,6 +311,8 @@ export function useGarden() {
     addTask,
     toggleTask,
     deleteTask,
+    postponeTask,
     setNotifications,
+    updateSettings,
   };
 }

@@ -1,13 +1,14 @@
 import { useState } from "react";
-import type { Task } from "@/lib/garden-store";
-import { XP_REWARD } from "@/lib/garden-store";
-import { Check, Trash2, Clock, Plus } from "lucide-react";
+import type { Task, TaskKind } from "@/lib/garden-store";
+import { XP_REWARD, XP_PENALTY } from "@/lib/garden-store";
+import { Check, Trash2, Clock, Plus, ChevronsRight, ShieldAlert, Leaf } from "lucide-react";
 
 type Props = {
   tasks: Task[];
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
-  onAdd: (title: string, time: string, difficulty: Task["difficulty"]) => void;
+  onPostpone: (id: string) => void;
+  onAdd: (title: string, time: string, difficulty: Task["difficulty"], kind: TaskKind) => void;
 };
 
 const diffMeta = {
@@ -16,12 +17,22 @@ const diffMeta = {
   hard: { label: "개화", color: "text-accent" },
 } as const;
 
-export function TaskList({ tasks, onToggle, onDelete, onAdd }: Props) {
+export function TaskList({ tasks, onToggle, onDelete, onPostpone, onAdd }: Props) {
   const [title, setTitle] = useState("");
   const [time, setTime] = useState("09:00");
   const [difficulty, setDifficulty] = useState<Task["difficulty"]>("medium");
+  const [kind, setKind] = useState<TaskKind>("must");
+  const [burstId, setBurstId] = useState<string | null>(null);
 
   const sorted = [...tasks].sort((a, b) => a.time.localeCompare(b.time));
+
+  const handleToggle = (t: Task) => {
+    if (!t.completed) {
+      setBurstId(t.id);
+      window.setTimeout(() => setBurstId(null), 1200);
+    }
+    onToggle(t.id);
+  };
 
   return (
     <section className="space-y-5">
@@ -36,38 +47,63 @@ export function TaskList({ tasks, onToggle, onDelete, onAdd }: Props) {
         onSubmit={(e) => {
           e.preventDefault();
           if (!title.trim()) return;
-          onAdd(title.trim(), time, difficulty);
+          onAdd(title.trim(), time, difficulty, kind);
           setTitle("");
         }}
-        className="bg-card/60 border border-white/10 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] gap-3"
+        className="bg-card/60 border border-white/10 rounded-2xl p-4 space-y-3"
       >
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="새로운 씨앗 심기..."
-          className="bg-transparent border-b border-white/10 focus:border-primary outline-none px-2 py-2 text-sm"
+          className="w-full bg-transparent border-b border-white/10 focus:border-primary outline-none px-2 py-2 text-sm"
         />
-        <input
-          type="time"
-          value={time}
-          onChange={(e) => setTime(e.target.value)}
-          className="bg-input/40 rounded-lg px-3 py-2 text-sm border border-white/10"
-        />
-        <select
-          value={difficulty}
-          onChange={(e) => setDifficulty(e.target.value as Task["difficulty"])}
-          className="bg-input/40 rounded-lg px-3 py-2 text-sm border border-white/10"
-        >
-          <option value="easy">씨앗 +20</option>
-          <option value="medium">새싹 +45</option>
-          <option value="hard">개화 +80</option>
-        </select>
-        <button
-          type="submit"
-          className="bg-gradient-bloom text-foreground rounded-lg px-4 py-2 text-sm font-semibold hover:shadow-bloom transition-shadow flex items-center gap-1.5"
-        >
-          <Plus className="size-4" /> 심기
-        </button>
+        <div className="grid grid-cols-2 md:grid-cols-[auto_auto_1fr_auto] gap-2 items-center">
+          <input
+            type="time"
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+            className="bg-input/40 rounded-lg px-3 py-2 text-sm border border-white/10"
+          />
+          <select
+            value={difficulty}
+            onChange={(e) => setDifficulty(e.target.value as Task["difficulty"])}
+            className="bg-input/40 rounded-lg px-3 py-2 text-sm border border-white/10"
+          >
+            <option value="easy">씨앗 +20</option>
+            <option value="medium">새싹 +45</option>
+            <option value="hard">개화 +80</option>
+          </select>
+
+          {/* Kind toggle */}
+          <div className="col-span-2 md:col-span-1 inline-flex rounded-lg border border-white/10 bg-input/40 p-0.5 text-xs">
+            <button
+              type="button"
+              onClick={() => setKind("must")}
+              className={`flex-1 px-3 py-1.5 rounded-md flex items-center justify-center gap-1.5 transition ${
+                kind === "must" ? "bg-destructive/30 text-destructive-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <ShieldAlert className="size-3.5" /> 필수 (-{XP_PENALTY[difficulty]})
+            </button>
+            <button
+              type="button"
+              onClick={() => setKind("flex")}
+              className={`flex-1 px-3 py-1.5 rounded-md flex items-center justify-center gap-1.5 transition ${
+                kind === "flex" ? "bg-primary/20 text-primary" : "text-muted-foreground"
+              }`}
+            >
+              <Leaf className="size-3.5" /> 미뤄도 OK
+            </button>
+          </div>
+
+          <button
+            type="submit"
+            className="col-span-2 md:col-span-1 bg-gradient-bloom text-foreground rounded-lg px-4 py-2 text-sm font-semibold hover:shadow-bloom transition-shadow flex items-center justify-center gap-1.5"
+          >
+            <Plus className="size-4" /> 심기
+          </button>
+        </div>
       </form>
 
       {/* Task list */}
@@ -79,18 +115,21 @@ export function TaskList({ tasks, onToggle, onDelete, onAdd }: Props) {
         )}
         {sorted.map((t) => {
           const meta = diffMeta[t.difficulty];
+          const isFlex = t.kind === "flex";
           return (
             <div
               key={t.id}
-              className={`group flex items-center gap-4 p-4 rounded-2xl border transition-all ${
+              className={`group relative flex items-center gap-4 p-4 rounded-2xl border transition-all ${
                 t.completed
                   ? "bg-card/30 border-white/5 opacity-60"
-                  : "bg-card border-white/10 hover:border-primary/30"
+                  : isFlex
+                    ? "bg-card border-primary/15 hover:border-primary/40"
+                    : "bg-card border-white/10 hover:border-accent/40"
               }`}
             >
               <button
-                onClick={() => onToggle(t.id)}
-                className={`size-8 rounded-full border-2 flex items-center justify-center transition-all shrink-0 ${
+                onClick={() => handleToggle(t)}
+                className={`relative size-8 rounded-full border-2 flex items-center justify-center transition-all shrink-0 ${
                   t.completed
                     ? "bg-primary border-primary"
                     : "border-white/20 hover:border-primary"
@@ -98,25 +137,61 @@ export function TaskList({ tasks, onToggle, onDelete, onAdd }: Props) {
                 aria-label="완료 토글"
               >
                 {t.completed && <Check className="size-4 text-primary-foreground" strokeWidth={3} />}
+                {burstId === t.id && (
+                  <>
+                    <span className="pointer-events-none absolute inset-0 rounded-full bg-primary/40 animate-bloom-burst" />
+                    <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 text-base animate-petal" style={{ animationDelay: "0ms" }}>🌸</span>
+                    <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 text-base animate-petal" style={{ animationDelay: "120ms", filter: "hue-rotate(40deg)" }}>✨</span>
+                    <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 text-base animate-petal" style={{ animationDelay: "240ms" }}>🌟</span>
+                  </>
+                )}
               </button>
 
               <div className="flex-1 min-w-0">
-                <div
-                  className={`font-medium ${t.completed ? "line-through text-muted-foreground" : ""}`}
-                >
-                  {t.title}
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`font-medium ${t.completed ? "line-through text-muted-foreground" : ""}`}
+                  >
+                    {t.title}
+                  </span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold ${
+                      isFlex
+                        ? "bg-primary/15 text-primary border border-primary/30"
+                        : "bg-destructive/15 text-destructive border border-destructive/30"
+                    }`}
+                  >
+                    {isFlex ? "FLEX" : "MUST"}
+                  </span>
+                  {t.postponedCount && t.postponedCount > 0 ? (
+                    <span className="text-[10px] text-muted-foreground">↻ {t.postponedCount}회 미룸</span>
+                  ) : null}
                 </div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Clock className="size-3" /> {t.time}
                   </span>
                   <span className={meta.color}>● {meta.label}</span>
+                  <span className="text-muted-foreground/70">
+                    {isFlex ? "벌점 없음" : `미완료 시 -${XP_PENALTY[t.difficulty]}`}
+                  </span>
                 </div>
               </div>
 
               <div className="text-xs font-bold text-primary tabular-nums">
                 +{XP_REWARD[t.difficulty]} XP
               </div>
+
+              {isFlex && !t.completed && (
+                <button
+                  onClick={() => onPostpone(t.id)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary p-1"
+                  aria-label="내일로 미루기"
+                  title="내일로 미루기"
+                >
+                  <ChevronsRight className="size-4" />
+                </button>
+              )}
 
               <button
                 onClick={() => onDelete(t.id)}
