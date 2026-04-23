@@ -155,15 +155,12 @@ function TaskRow({
   );
 }
 
-export function TaskList({ tasks, onToggle, onDelete, onPostpone, onAdd, onReorder }: Props) {
+export function TaskList({ tasks, onToggle, onDelete, onPostpone, onAdd, onReorder: _onReorder }: Props) {
   const [title, setTitle] = useState("");
   const [time, setTime] = useState("09:00");
   const [difficulty, setDifficulty] = useState<Task["difficulty"]>("medium");
   const [kind, setKind] = useState<TaskKind>("must");
   const [burstId, setBurstId] = useState<string | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
-
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const sorted = [...tasks].sort((a, b) => {
     const ao = a.order ?? 0;
@@ -180,19 +177,6 @@ export function TaskList({ tasks, onToggle, onDelete, onPostpone, onAdd, onReord
     onToggle(t.id);
   };
 
-  const handleDragStart = (e: DragStartEvent) => setActiveId(String(e.active.id));
-  const handleDragEnd = (e: DragEndEvent) => {
-    setActiveId(null);
-    const { active, over } = e;
-    if (!over || active.id === over.id) return;
-    const ids = sorted.map((t) => t.id);
-    const oldIdx = ids.indexOf(String(active.id));
-    const newIdx = ids.indexOf(String(over.id));
-    if (oldIdx === -1 || newIdx === -1) return;
-    onReorder(arrayMove(ids, oldIdx, newIdx));
-  };
-
-  const activeTask = sorted.find((t) => t.id === activeId);
   const mustCount = sorted.filter((t) => t.kind === "must" && !t.completed).length;
 
   return (
@@ -210,7 +194,6 @@ export function TaskList({ tasks, onToggle, onDelete, onPostpone, onAdd, onReord
         )}
       </div>
 
-      {/* Add form */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -271,52 +254,31 @@ export function TaskList({ tasks, onToggle, onDelete, onPostpone, onAdd, onReord
         </div>
       </form>
 
-      {/* Hint */}
       {sorted.length > 0 && (
         <p className="text-[11px] text-muted-foreground/70 flex items-center gap-1.5 px-1">
-          <GripVertical className="size-3" /> 드래그로 순서를 바꾸거나, 프로젝트 카드에 떨어뜨려 임무로 편입시킬 수 있어요.
+          <GripVertical className="size-3" /> 드래그로 순서를 바꾸거나, 보스 카드에 떨어뜨려 서브 임무로 편입시킬 수 있어요.
         </p>
       )}
 
-      {/* Task list */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext items={sorted.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-3">
-            {sorted.length === 0 && (
-              <p className="text-center text-muted-foreground text-sm py-12">
-                아직 심은 씨앗이 없어요. 첫 일을 추가해보세요 🌱
-              </p>
-            )}
-            {sorted.map((t) => (
-              <TaskRow
-                key={t.id}
-                t={t}
-                onToggle={handleToggle}
-                onDelete={onDelete}
-                onPostpone={onPostpone}
-                burstId={burstId}
-              />
-            ))}
-          </div>
-        </SortableContext>
-        <DragOverlay>
-          {activeTask ? (
+      <SortableContext items={sorted.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+        <div className="space-y-3">
+          {sorted.length === 0 && (
+            <p className="text-center text-muted-foreground text-sm py-12">
+              아직 심은 씨앗이 없어요. 첫 일을 추가해보세요 🌱
+            </p>
+          )}
+          {sorted.map((t) => (
             <TaskRow
-              t={activeTask}
-              onToggle={() => {}}
-              onDelete={() => {}}
-              onPostpone={() => {}}
-              burstId={null}
-              isOverlay
+              key={t.id}
+              t={t}
+              onToggle={handleToggle}
+              onDelete={onDelete}
+              onPostpone={onPostpone}
+              burstId={burstId}
             />
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+          ))}
+        </div>
+      </SortableContext>
     </section>
   );
 }
