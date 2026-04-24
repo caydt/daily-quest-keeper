@@ -45,6 +45,14 @@ export type DayLog = {
   xpLost: number;
 };
 
+export type Farm = {
+  id: string;
+  title: string;
+  icon?: string;   // 농장 대표 이모지
+  createdAt: number;
+  order: number;
+};
+
 export type Project = {
   id: string;
   title: string;
@@ -55,6 +63,31 @@ export type Project = {
   dueDate?: string; // YYYY-MM-DD optional
   order: number;
   toolIds?: string[]; // 첨부된 도구 ID들
+  farmId?: string | null; // 속한 농장 ID (null = 독립 나무)
+};
+
+// 나무 성장 단계 (서브태스크 완료율 기반)
+export const treeStage = (
+  pct: number, // 0~100
+  completed: boolean,
+): { icon: string; label: string; tier: number } => {
+  if (completed)        return { icon: "🏆", label: "완성",    tier: 5 };
+  if (pct >= 80)        return { icon: "🌳", label: "거목",    tier: 4 };
+  if (pct >= 50)        return { icon: "🌲", label: "성목",    tier: 3 };
+  if (pct >= 20)        return { icon: "🌿", label: "새싹",    tier: 2 };
+  return                       { icon: "🌱", label: "씨앗",    tier: 1 };
+};
+
+// 농장 성장 단계 (포함된 나무 수 + 평균 완료율 기반)
+export const farmStage = (
+  treeCount: number,
+  avgPct: number,
+): { icon: string; label: string } => {
+  if (treeCount === 0)             return { icon: "🪨", label: "빈 땅"   };
+  if (treeCount >= 5 && avgPct >= 80) return { icon: "🏡", label: "마을"   };
+  if (treeCount >= 3 && avgPct >= 50) return { icon: "🌾", label: "농장"   };
+  if (treeCount >= 2)              return { icon: "🌱", label: "정원"   };
+  return                                   { icon: "🪴", label: "묘목장" };
 };
 
 export type Achievement = {
@@ -75,6 +108,7 @@ export type GardenState = {
   lastActiveDate: string | null;
   tasks: Task[];
   projects: Project[];
+  farms: Farm[];
   notificationsEnabled: boolean;
   settings: Settings;
   history: DayLog[];
@@ -164,6 +198,7 @@ const initial: GardenState = {
   lastActiveDate: null,
   tasks: [],
   projects: [],
+  farms: [],
   notificationsEnabled: false,
   settings: { morningTime: "08:00", eveningTime: "21:00" },
   history: [],
@@ -208,6 +243,7 @@ const load = (): GardenState => {
       settings: { ...initial.settings, ...(parsed.settings || {}) },
       history: parsed.history || [],
       projects: parsed.projects || [],
+      farms: parsed.farms || [],
       achievements: parsed.achievements || {},
       localTools: parsed.localTools || [],
     };
@@ -617,6 +653,51 @@ export function useGarden() {
     });
   }, []);
 
+  // ====== Farms ======
+  const addFarm = useCallback((title: string, icon?: string) => {
+    setState((s) => ({
+      ...s,
+      farms: [
+        ...s.farms,
+        {
+          id: crypto.randomUUID(),
+          title,
+          icon: icon ?? "🌾",
+          createdAt: Date.now(),
+          order: s.farms.length,
+        },
+      ],
+    }));
+  }, []);
+
+  const deleteFarm = useCallback((id: string) => {
+    setState((s) => ({
+      ...s,
+      farms: s.farms.filter((f) => f.id !== id),
+      // 해당 농장 나무들은 독립 나무로 전환
+      projects: s.projects.map((p) =>
+        p.farmId === id ? { ...p, farmId: null } : p,
+      ),
+    }));
+  }, []);
+
+  const updateFarm = useCallback((id: string, patch: Partial<Pick<Farm, "title" | "icon">>) => {
+    setState((s) => ({
+      ...s,
+      farms: s.farms.map((f) => (f.id === id ? { ...f, ...patch } : f)),
+    }));
+  }, []);
+
+  // 나무(프로젝트)를 농장으로 이동하거나 독립 나무로 전환
+  const moveProjectToFarm = useCallback((projectId: string, farmId: string | null) => {
+    setState((s) => ({
+      ...s,
+      projects: s.projects.map((p) =>
+        p.id === projectId ? { ...p, farmId } : p,
+      ),
+    }));
+  }, []);
+
   // ====== Local Tools CRUD ======
   const addLocalTool = useCallback(
     (tool: Omit<Tool, "id" | "tags"> & { tags?: string[] }) => {
@@ -686,6 +767,10 @@ export function useGarden() {
     deleteProject,
     reorderProjects,
     toggleProject,
+    addFarm,
+    deleteFarm,
+    updateFarm,
+    moveProjectToFarm,
     setCondition,
     addLocalTool,
     updateLocalTool,

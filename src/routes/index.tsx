@@ -58,6 +58,10 @@ function Index() {
     toggleProject,
     deleteProject,
     reorderProjects,
+    addFarm,
+    deleteFarm,
+    updateFarm,
+    moveProjectToFarm,
   } = useGarden();
   const today = todayStr();
   const todaysTasks = state.tasks.filter((t) => t.date === today);
@@ -210,6 +214,7 @@ function Index() {
             <div className="space-y-6 min-w-0">
               <ProjectList
                 projects={state.projects}
+                farms={state.farms}
                 tasks={state.tasks}
                 totalXp={state.totalXp}
                 onAdd={addProject}
@@ -217,6 +222,10 @@ function Index() {
                 onDelete={deleteProject}
                 onReorder={reorderProjects}
                 onAssignTask={assignTaskToProject}
+                onAddFarm={addFarm}
+                onDeleteFarm={deleteFarm}
+                onUpdateFarm={updateFarm}
+                onMoveProjectToFarm={moveProjectToFarm}
               />
               <TaskList
                 tasks={visibleStandalone}
