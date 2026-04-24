@@ -1,5 +1,5 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { useGarden, todayStr, filterTasksByCondition, CONDITION_META } from "@/lib/garden-store";
 import type { ConditionMode } from "@/lib/garden-store";
 import { useReminders, requestNotificationPermission } from "@/lib/notifications";
@@ -44,7 +44,6 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const { user, loading: authLoading, signOut } = useAuth();
-  const navigate = useNavigate();
   const {
     state,
     hydrated,
