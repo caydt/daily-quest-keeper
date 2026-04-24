@@ -43,6 +43,8 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const { user, loading: authLoading, signOut } = useAuth();
+  const navigate = useNavigate();
   const {
     state,
     hydrated,
