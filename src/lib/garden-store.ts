@@ -352,10 +352,9 @@ export function useGarden() {
         if (hasLocalData) {
           await supabase
             .from("garden_state")
-            .upsert(
-              { user_id: user.id, state: local as unknown as Record<string, unknown> },
-              { onConflict: "user_id" },
-            );
+            .upsert([{ user_id: user.id, state: local as unknown as never }], {
+              onConflict: "user_id",
+            });
         }
       } else {
         next = { ...initial, ...(remoteState as GardenState) };
@@ -394,10 +393,9 @@ export function useGarden() {
       if (currentUserId.current !== user.id) return;
       await supabase
         .from("garden_state")
-        .upsert(
-          { user_id: user.id, state: state as unknown as Record<string, unknown> },
-          { onConflict: "user_id" },
-        );
+        .upsert([{ user_id: user.id, state: state as unknown as never }], {
+          onConflict: "user_id",
+        });
     }, 600);
 
     return () => {
