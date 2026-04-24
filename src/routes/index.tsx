@@ -195,6 +195,28 @@ function Index() {
             >
               <SettingsIcon className="size-3.5" /> <span className="hidden sm:inline">설정</span>
             </Link>
+            {!authLoading && (
+              user ? (
+                <button
+                  onClick={async () => { await signOut(); }}
+                  title={user.email ?? "로그아웃"}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary/20 text-xs font-medium text-primary transition"
+                >
+                  <Cloud className="size-3.5" />
+                  <span className="hidden md:inline max-w-[120px] truncate">
+                    {user.email?.split("@")[0]}
+                  </span>
+                  <LogOut className="size-3.5 opacity-70" />
+                </button>
+              ) : (
+                <Link
+                  to="/auth"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-400/30 bg-amber-400/10 hover:bg-amber-400/20 text-xs font-medium text-amber-300 transition"
+                >
+                  <LogIn className="size-3.5" /> <span className="hidden sm:inline">로그인 (동기화)</span>
+                </Link>
+              )
+            )}
           </div>
         </header>
 
