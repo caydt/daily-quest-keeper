@@ -1,8 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useGarden, todayStr, filterTasksByCondition, CONDITION_META } from "@/lib/garden-store";
 import type { ConditionMode } from "@/lib/garden-store";
 import { useReminders, requestNotificationPermission } from "@/lib/notifications";
+import { useAuth } from "@/lib/auth-context";
 import { Avatar } from "@/components/garden/Avatar";
 import { TaskList } from "@/components/garden/TaskList";
 import { ProjectList } from "@/components/garden/ProjectList";
@@ -10,7 +11,7 @@ import { QuestPanel } from "@/components/garden/QuestPanel";
 import { AchievementCodex } from "@/components/garden/AchievementCodex";
 import { SidePanels } from "@/components/garden/SidePanels";
 import { ConditionSelector } from "@/components/garden/ConditionSelector";
-import { Settings as SettingsIcon, BarChart3, Bell, BellOff, Wrench } from "lucide-react";
+import { Settings as SettingsIcon, BarChart3, Bell, BellOff, Wrench, LogOut, LogIn, Cloud } from "lucide-react";
 import {
   DndContext,
   PointerSensor,
