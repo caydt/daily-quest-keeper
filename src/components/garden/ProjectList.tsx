@@ -18,7 +18,6 @@ import {
   Pencil,
   MoveRight,
   ExternalLink,
-  Link2,
 } from "lucide-react";
 import { ToolChipBar } from "@/components/garden/ToolChipBar";
 import { ToolPicker } from "@/components/garden/ToolPicker";
