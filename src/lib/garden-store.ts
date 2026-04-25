@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { Tool } from "@/lib/tools-sheet";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/auth-context";
+import { createLocalAdapter } from "@/lib/storage";
+import { getScriptUrl, createSheetsAdapter } from "@/lib/sheets-adapter";
 
 export type TaskKind = "must" | "flex"; // must = 당일 필수(벌점), flex = 연기 가능(벌점 없음)
 
@@ -137,8 +137,6 @@ export const filterTasksByCondition = (tasks: Task[], condition: ConditionMode):
   }
 };
 
-const STORAGE_KEY = "lumi-garden-v3";
-
 export const XP_REWARD = { easy: 20, medium: 45, hard: 80 } as const;
 export const XP_PENALTY = { easy: 10, medium: 20, hard: 35 } as const;
 export const DAILY_CLEAR_BONUS = 75; // 모든 일반 할일 완료 시
@@ -210,58 +208,6 @@ const initial: GardenState = {
   localTools: [],
 };
 
-const load = (): GardenState => {
-  if (typeof window === "undefined") return initial;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      // migrate from v2
-      const v2 = localStorage.getItem("lumi-garden-v2");
-      if (v2) {
-        const old = JSON.parse(v2);
-        return {
-          ...initial,
-          ...old,
-          tasks: (old.tasks || []).map((t: any, i: number) => ({
-            ...t,
-            kind: t.kind ?? "must",
-            order: t.order ?? i,
-            projectId: t.projectId ?? null,
-          })),
-          projects: (old.projects || []).map((p: any, i: number) => ({
-            ...p,
-            order: p.order ?? i,
-          })),
-          achievements: old.achievements || {},
-          combo: 0,
-        };
-      }
-      return initial;
-    }
-    const parsed = JSON.parse(raw);
-    return {
-      ...initial,
-      ...parsed,
-      settings: { ...initial.settings, ...(parsed.settings || {}) },
-      history: parsed.history || [],
-      projects: parsed.projects || [],
-      farms: parsed.farms || [],
-      achievements: parsed.achievements || {},
-      localTools: parsed.localTools || [],
-    };
-  } catch {
-    return initial;
-  }
-};
-
-const save = (s: GardenState) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
-  } catch {
-    /* ignore */
-  }
-};
-
 const checkAchievements = (s: GardenState, ctx: { event?: string }): GardenState => {
   const ach = { ...s.achievements };
   const now = Date.now();
@@ -295,149 +241,111 @@ const checkAchievements = (s: GardenState, ctx: { event?: string }): GardenState
 };
 
 export function useGarden() {
-  const { user, loading: authLoading } = useAuth();
   const [state, setState] = useState<GardenState>(initial);
   const [hydrated, setHydrated] = useState(false);
   const isApplyingRemote = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const currentUserId = useRef<string | null>(null);
 
-  // 로드: 로그인 상태에 따라 클라우드 또는 로컬에서
+  // 로드: StorageAdapter 기반
   useEffect(() => {
-    if (authLoading) return;
     let cancelled = false;
 
     const run = async () => {
       setHydrated(false);
+      const scriptUrl = getScriptUrl();
+      const adapter = scriptUrl ? createSheetsAdapter(scriptUrl) : createLocalAdapter();
 
-      if (!user) {
-        // 게스트: 로컬에서
-        currentUserId.current = null;
-        const local = load();
-        if (!cancelled) {
-          isApplyingRemote.current = true;
-          setState(local);
-          setHydrated(true);
-          requestAnimationFrame(() => { isApplyingRemote.current = false; });
-        }
-        return;
-      }
+      try {
+        const remote = await adapter.load();
+        if (cancelled) return;
 
-      currentUserId.current = user.id;
-
-      // 클라우드 행 가져오기
-      const { data, error } = await supabase
-        .from("garden_state")
-        .select("state")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (cancelled) return;
-
-      let next: GardenState;
-      const remoteState = (data?.state ?? null) as Partial<GardenState> | null;
-      const remoteEmpty =
-        !remoteState ||
-        Object.keys(remoteState).length === 0 ||
-        ((!remoteState.tasks || remoteState.tasks.length === 0) &&
-          (!remoteState.projects || remoteState.projects.length === 0) &&
-          (!remoteState.totalXp || remoteState.totalXp === 0));
-
-      if (remoteEmpty) {
-        // 첫 로그인: 로컬 데이터를 마이그레이션
-        const local = load();
-        next = local;
-        const hasLocalData =
-          local.tasks.length > 0 || local.projects.length > 0 || local.totalXp > 0;
-        if (hasLocalData) {
-          await supabase
-            .from("garden_state")
-            .upsert([{ user_id: user.id, state: local as unknown as never }], {
-              onConflict: "user_id",
-            });
-        }
-      } else {
-        next = { ...initial, ...(remoteState as GardenState) };
-        // 형태 보정
-        next.settings = { ...initial.settings, ...(next.settings || {}) };
-        next.history = next.history || [];
-        next.projects = next.projects || [];
-        next.farms = next.farms || [];
-        next.achievements = next.achievements || {};
-        next.localTools = next.localTools || [];
-      }
-
-      if (cancelled) return;
-      isApplyingRemote.current = true;
-      setState(next);
-      setHydrated(true);
-      requestAnimationFrame(() => { isApplyingRemote.current = false; });
-    };
-
-    run();
-    return () => { cancelled = true; };
-  }, [user, authLoading]);
-
-  // 저장: 게스트는 localStorage, 로그인 사용자는 debounce upsert
-  useEffect(() => {
-    if (!hydrated) return;
-    if (isApplyingRemote.current) return;
-
-    if (!user) {
-      save(state);
-      return;
-    }
-
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      if (currentUserId.current !== user.id) return;
-      await supabase
-        .from("garden_state")
-        .upsert([{ user_id: user.id, state: state as unknown as never }], {
-          onConflict: "user_id",
-        });
-    }, 600);
-
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-    };
-  }, [state, hydrated, user]);
-
-  // 실시간 구독: 다른 기기 변경 수신
-  useEffect(() => {
-    if (!user) return;
-    const channel = supabase
-      .channel(`garden_state:${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "garden_state",
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          const remote = (payload.new as { state?: Partial<GardenState> })?.state;
-          if (!remote) return;
-          isApplyingRemote.current = true;
-          setState((prev) => ({
+        let next: GardenState;
+        if (!remote || Object.keys(remote).length === 0) {
+          const local = await createLocalAdapter().load();
+          next = local ? { ...initial, ...local, settings: { ...initial.settings, ...(local.settings || {}) }, history: local.history || [], projects: local.projects || [], farms: local.farms || [], achievements: local.achievements || {}, localTools: local.localTools || [] } : initial;
+          if (scriptUrl && next !== initial) {
+            await createSheetsAdapter(scriptUrl).save(next).catch(() => {});
+          }
+        } else {
+          next = {
             ...initial,
-            ...(remote as GardenState),
-            settings: { ...initial.settings, ...(remote.settings || prev.settings) },
+            ...remote,
+            settings: { ...initial.settings, ...(remote.settings || {}) },
             history: remote.history || [],
             projects: remote.projects || [],
             farms: remote.farms || [],
             achievements: remote.achievements || {},
             localTools: remote.localTools || [],
-          }));
-          requestAnimationFrame(() => { isApplyingRemote.current = false; });
-        },
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
+          };
+        }
+
+        if (cancelled) return;
+        isApplyingRemote.current = true;
+        setState(next);
+        setHydrated(true);
+        requestAnimationFrame(() => { isApplyingRemote.current = false; });
+      } catch {
+        const local = await createLocalAdapter().load();
+        if (cancelled) return;
+        isApplyingRemote.current = true;
+        setState(local ? { ...initial, ...local } : initial);
+        setHydrated(true);
+        requestAnimationFrame(() => { isApplyingRemote.current = false; });
+      }
     };
-  }, [user]);
+
+    run();
+    return () => { cancelled = true; };
+  }, []);
+
+  // 저장: StorageAdapter 기반 debounce 저장
+  useEffect(() => {
+    if (!hydrated) return;
+    if (isApplyingRemote.current) return;
+
+    const scriptUrl = getScriptUrl();
+    const adapter = scriptUrl ? createSheetsAdapter(scriptUrl) : createLocalAdapter();
+
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      adapter.save(state).catch(() => {
+        createLocalAdapter().save(state);
+      });
+    }, 600);
+
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, [state, hydrated]);
+
+  // 윈도우 포커스 시 원격 데이터 리패치
+  useEffect(() => {
+    const onFocus = async () => {
+      const scriptUrl = getScriptUrl();
+      if (!scriptUrl) return;
+      try {
+        const remote = await createSheetsAdapter(scriptUrl).load();
+        if (!remote) return;
+        isApplyingRemote.current = true;
+        setState((prev) => ({
+          ...initial,
+          ...remote,
+          settings: { ...initial.settings, ...(remote.settings || prev.settings) },
+          history: remote.history || [],
+          projects: remote.projects || [],
+          farms: remote.farms || [],
+          achievements: remote.achievements || {},
+          localTools: remote.localTools || [],
+        }));
+        requestAnimationFrame(() => { isApplyingRemote.current = false; });
+      } catch {
+        /* 무시 */
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
 
   // 일일 정산
   useEffect(() => {
