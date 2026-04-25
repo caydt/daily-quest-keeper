@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { useGarden } from "@/lib/garden-store";
 import { requestNotificationPermission } from "@/lib/notifications";
-import { ArrowLeft, Bell, BellOff, Sunrise, Moon, Wrench, ExternalLink } from "lucide-react";
+import { getScriptUrl, setScriptUrl, testScriptUrl } from "@/lib/sheets-adapter";
+import { ArrowLeft, Bell, BellOff, Sunrise, Moon, Wrench, ExternalLink, Link2, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -15,6 +17,25 @@ export const Route = createFileRoute("/settings")({
 
 function SettingsPage() {
   const { state, hydrated, updateSettings, setNotifications } = useGarden();
+  const [scriptUrl, setScriptUrlState] = useState(() => getScriptUrl());
+  const [testState, setTestState] = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [testError, setTestError] = useState("");
+
+  const handleSaveScriptUrl = () => {
+    setScriptUrl(scriptUrl.trim());
+    window.location.reload();
+  };
+
+  const handleTestUrl = async () => {
+    setTestState("loading");
+    const result = await testScriptUrl(scriptUrl.trim());
+    if (result.ok) {
+      setTestState("ok");
+    } else {
+      setTestState("error");
+      setTestError(result.error ?? "알 수 없는 오류");
+    }
+  };
 
   if (!hydrated) return <div className="min-h-dvh" />;
 
@@ -115,6 +136,97 @@ function SettingsPage() {
           <p className="text-xs text-muted-foreground">
             할일 자체의 알람은 각 할일에 설정한 시간으로 자동 발송됩니다.
           </p>
+        </section>
+
+        {/* Apps Script 동기화 */}
+        <section className="bg-card/60 border border-white/10 rounded-3xl p-6 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="size-10 rounded-xl bg-gradient-bloom flex items-center justify-center shrink-0">
+              <Link2 className="size-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <h2 className="font-semibold">데이터 동기화 (Google Apps Script)</h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                구글 시트에 Apps Script 웹앱을 배포하고 URL을 붙여넣으면 모든 기기에서 데이터가 동기화돼요.
+              </p>
+            </div>
+          </div>
+
+          <input
+            type="url"
+            placeholder="https://script.google.com/macros/s/.../exec"
+            value={scriptUrl}
+            onChange={(e) => {
+              setScriptUrlState(e.target.value);
+              setTestState("idle");
+            }}
+            className="w-full px-3 py-2.5 rounded-xl bg-input/40 border border-white/10 text-sm focus:border-primary/40 focus:outline-none"
+          />
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => void handleTestUrl()}
+              disabled={!scriptUrl.trim() || testState === "loading"}
+              className="px-4 py-2 rounded-xl border border-white/10 bg-card/60 hover:border-primary/40 text-sm text-muted-foreground hover:text-primary transition disabled:opacity-50 flex items-center gap-2"
+            >
+              {testState === "loading" && <Loader2 className="size-3.5 animate-spin" />}
+              {testState === "ok" && <CheckCircle2 className="size-3.5 text-emerald-400" />}
+              {testState === "error" && <XCircle className="size-3.5 text-rose-400" />}
+              {testState === "idle" && "연결 테스트"}
+              {testState === "loading" && "테스트 중..."}
+              {testState === "ok" && "연결 성공!"}
+              {testState === "error" && "연결 실패"}
+            </button>
+
+            <button
+              onClick={handleSaveScriptUrl}
+              disabled={!scriptUrl.trim()}
+              className="px-4 py-2 rounded-xl bg-primary/15 border border-primary/40 text-primary text-sm font-semibold hover:bg-primary/25 transition disabled:opacity-40"
+            >
+              저장
+            </button>
+          </div>
+
+          {testState === "error" && (
+            <p className="text-xs text-rose-400">{testError}</p>
+          )}
+
+          <div className="rounded-2xl bg-background/40 border border-white/10 p-4 text-xs text-muted-foreground space-y-2">
+            <div className="font-semibold text-foreground">⚙️ Apps Script 배포 방법</div>
+            <ol className="space-y-1 list-decimal list-inside">
+              <li>구글 시트 열기 → 확장 프로그램 → Apps Script</li>
+              <li>아래 코드를 붙여넣고 저장</li>
+            </ol>
+            <pre className="bg-black/30 rounded px-2 py-2 text-[10px] font-mono text-primary/90 overflow-x-auto whitespace-pre">{`const SHEET_NAME = "Sheet1";
+
+function doGet() {
+  const sheet = SpreadsheetApp
+    .getActiveSpreadsheet()
+    .getSheetByName(SHEET_NAME);
+  const raw = sheet.getRange("A1").getValue();
+  const data = raw ? JSON.parse(raw) : {};
+  return ContentService
+    .createTextOutput(JSON.stringify({ ok: true, data }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  const sheet = SpreadsheetApp
+    .getActiveSpreadsheet()
+    .getSheetByName(SHEET_NAME);
+  const body = JSON.parse(e.postData.contents);
+  sheet.getRange("A1").setValue(JSON.stringify(body));
+  sheet.getRange("A2").setValue(new Date().toISOString());
+  return ContentService
+    .createTextOutput(JSON.stringify({ ok: true }))
+    .setMimeType(ContentService.MimeType.JSON);
+}`}</pre>
+            <ol start={3} className="space-y-1 list-decimal list-inside">
+              <li>배포 → 새 배포 → 유형: 웹앱</li>
+              <li>실행: 나 / 액세스: 모든 사용자</li>
+              <li>배포 후 URL 복사해서 위에 붙여넣기</li>
+            </ol>
+          </div>
         </section>
 
         {/* Tools sheet */}
