@@ -15,18 +15,25 @@ export function setScriptUrl(url: string) {
 export function createSheetsAdapter(scriptUrl: string): StorageAdapter {
   return {
     async load() {
-      const res = await fetch(scriptUrl, { method: "GET" });
-      if (!res.ok) throw new Error(`Apps Script GET 실패: ${res.status}`);
-      const json = (await res.json()) as { ok: boolean; data: GardenState };
-      if (!json.ok || !json.data || Object.keys(json.data).length === 0) return null;
-      return json.data;
+      try {
+        const res = await fetch(scriptUrl, { method: "GET" });
+        if (!res.ok) return null;
+        const json = (await res.json()) as { ok: boolean; data: GardenState };
+        if (!json.ok || !json.data || Object.keys(json.data).length === 0) return null;
+        return json.data;
+      } catch {
+        return null;
+      }
     },
     async save(state) {
       const res = await fetch(scriptUrl, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(state),
       });
       if (!res.ok) throw new Error(`Apps Script POST 실패: ${res.status}`);
+      const json = (await res.json()) as { ok?: boolean; error?: string };
+      if (!json.ok) throw new Error(json.error ?? "Apps Script POST 실패");
     },
   };
 }
