@@ -288,7 +288,16 @@ export function useGarden() {
         const local = await createLocalAdapter().load();
         if (cancelled) return;
         isApplyingRemote.current = true;
-        setState(local ? { ...initial, ...local } : initial);
+        setState(local ? {
+          ...initial,
+          ...local,
+          settings: { ...initial.settings, ...(local.settings || {}) },
+          history: local.history || [],
+          projects: local.projects || [],
+          farms: local.farms || [],
+          achievements: local.achievements || {},
+          localTools: local.localTools || [],
+        } : initial);
         setHydrated(true);
         requestAnimationFrame(() => { isApplyingRemote.current = false; });
       }
