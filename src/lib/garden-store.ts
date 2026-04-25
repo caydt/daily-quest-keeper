@@ -240,11 +240,15 @@ const checkAchievements = (s: GardenState, ctx: { event?: string }): GardenState
   return { ...s, achievements: ach };
 };
 
+export type SaveStatus = "idle" | "saving" | "saved" | "error";
+
 export function useGarden() {
   const [state, setState] = useState<GardenState>(initial);
   const [hydrated, setHydrated] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const isApplyingRemote = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 로드: StorageAdapter 기반
   useEffect(() => {
@@ -316,10 +320,19 @@ export function useGarden() {
     const adapter = scriptUrl ? createSheetsAdapter(scriptUrl) : createLocalAdapter();
 
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      adapter.save(state).catch(() => {
-        createLocalAdapter().save(state);
-      });
+    saveTimer.current = setTimeout(async () => {
+      setSaveStatus("saving");
+      try {
+        await adapter.save(state);
+        setSaveStatus("saved");
+        if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
+        savedResetTimer.current = setTimeout(() => setSaveStatus("idle"), 2000);
+      } catch {
+        await createLocalAdapter().save(state);
+        setSaveStatus("error");
+        if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
+        savedResetTimer.current = setTimeout(() => setSaveStatus("idle"), 3000);
+      }
     }, 600);
 
     return () => {
@@ -795,6 +808,28 @@ export function useGarden() {
     }));
   }, []);
 
+  // 수동 저장
+  const saveNow = useCallback(async () => {
+    if (!hydrated) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+
+    const scriptUrl = getScriptUrl();
+    const adapter = scriptUrl ? createSheetsAdapter(scriptUrl) : createLocalAdapter();
+
+    setSaveStatus("saving");
+    try {
+      await adapter.save(state);
+      setSaveStatus("saved");
+      if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
+      savedResetTimer.current = setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch {
+      await createLocalAdapter().save(state);
+      setSaveStatus("error");
+      if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
+      savedResetTimer.current = setTimeout(() => setSaveStatus("idle"), 3000);
+    }
+  }, [state, hydrated]);
+
   // 오늘 컨디션이 설정됐는지 여부 (날짜 기준 자동 초기화)
   const todayCondition: ConditionMode | null =
     state.conditionSetOn === todayStr() ? state.condition : null;
@@ -802,6 +837,8 @@ export function useGarden() {
   return {
     state,
     hydrated,
+    saveStatus,
+    saveNow,
     todayCondition,
     addTask,
     toggleTask,

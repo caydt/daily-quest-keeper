@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useGarden } from "@/lib/garden-store";
 import { requestNotificationPermission } from "@/lib/notifications";
 import { getScriptUrl, setScriptUrl, testScriptUrl } from "@/lib/sheets-adapter";
-import { ArrowLeft, Bell, BellOff, Sunrise, Moon, Wrench, ExternalLink, Link2, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Bell, BellOff, Sunrise, Moon, Wrench, ExternalLink, Link2, CheckCircle2, XCircle, Loader2, Save } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -16,7 +16,7 @@ export const Route = createFileRoute("/settings")({
 });
 
 function SettingsPage() {
-  const { state, hydrated, updateSettings, setNotifications } = useGarden();
+  const { state, hydrated, updateSettings, setNotifications, saveNow, saveStatus } = useGarden();
   const [scriptUrl, setScriptUrlState] = useState(() => getScriptUrl());
   const [testState, setTestState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [testError, setTestError] = useState("");
@@ -189,6 +189,34 @@ function SettingsPage() {
 
           {testState === "error" && (
             <p className="text-xs text-rose-400">{testError}</p>
+          )}
+
+          {/* 수동 저장 */}
+          {getScriptUrl() && (
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={() => void saveNow()}
+                disabled={saveStatus === "saving"}
+                className="px-4 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-sm font-semibold hover:bg-emerald-500/25 transition disabled:opacity-50 flex items-center gap-2"
+              >
+                {saveStatus === "saving" ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Save className="size-3.5" />
+                )}
+                {saveStatus === "saving" ? "저장 중..." : "지금 저장"}
+              </button>
+              {saveStatus === "saved" && (
+                <span className="text-xs text-emerald-400 flex items-center gap-1">
+                  <CheckCircle2 className="size-3.5" /> 저장됨
+                </span>
+              )}
+              {saveStatus === "error" && (
+                <span className="text-xs text-rose-400 flex items-center gap-1">
+                  <XCircle className="size-3.5" /> 저장 실패 (로컬에 백업됨)
+                </span>
+              )}
+            </div>
           )}
 
           <div className="rounded-2xl bg-background/40 border border-white/10 p-4 text-xs text-muted-foreground space-y-2">

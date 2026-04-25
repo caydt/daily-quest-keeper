@@ -26,9 +26,11 @@ export function createSheetsAdapter(scriptUrl: string): StorageAdapter {
       }
     },
     async save(state) {
+      // Content-Type을 text/plain으로 설정: application/json은 CORS preflight를 유발해
+      // Google Apps Script가 OPTIONS 요청을 처리하지 못해 POST가 차단됨
       const res = await fetch(scriptUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "text/plain" },
         body: JSON.stringify(state),
       });
       if (!res.ok) throw new Error(`Apps Script POST 실패: ${res.status}`);
