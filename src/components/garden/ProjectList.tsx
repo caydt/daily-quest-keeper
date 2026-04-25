@@ -18,6 +18,7 @@ import {
   Pencil,
   MoveRight,
   ExternalLink,
+  Link2,
 } from "lucide-react";
 import { ToolChipBar } from "@/components/garden/ToolChipBar";
 import { ToolPicker } from "@/components/garden/ToolPicker";
@@ -89,6 +90,9 @@ function ProjectCard({
     data: { type: "project-drop", projectId: p.id },
   });
   const [showMoveMenu, setShowMoveMenu] = useState(false);
+  const [showProjectPicker, setShowProjectPicker] = useState(false);
+  const [editingAiUrl, setEditingAiUrl] = useState(false);
+  const [aiUrlInput, setAiUrlInput] = useState(p.aiUrl ?? "");
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -210,6 +214,46 @@ function ProjectCard({
 
           {/* 액션 버튼들 */}
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            {/* AI URL */}
+            <div className="relative">
+              {p.aiUrl ? (
+                <>
+                  <a
+                    href={p.aiUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 rounded-lg hover:bg-white/5 text-primary hover:text-primary/80 transition inline-flex"
+                    title="AI 열기"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Link2 className="size-3.5" />
+                  </a>
+                  <button
+                    onClick={() => { setEditingAiUrl((v) => !v); setAiUrlInput(p.aiUrl ?? ""); }}
+                    className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition"
+                    title="AI URL 수정"
+                  >
+                    <Pencil className="size-3.5" />
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setEditingAiUrl((v) => !v)}
+                  className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition"
+                  title="AI URL 연결"
+                >
+                  <Link2 className="size-3.5" />
+                </button>
+              )}
+            </div>
+            {/* 도구 연결 */}
+            <button
+              onClick={() => setShowProjectPicker((v) => !v)}
+              className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition"
+              title="도구 연결"
+            >
+              <Plus className="size-3.5" />
+            </button>
             {/* 농장으로 이동 */}
             {farms.length > 0 && (
               <div className="relative">
@@ -260,6 +304,59 @@ function ProjectCard({
             </button>
           </div>
         </div>
+
+        {/* AI URL 인라인 입력 */}
+        {editingAiUrl && (
+          <div className="mt-3 flex items-center gap-2">
+            <input
+              autoFocus
+              type="url"
+              value={aiUrlInput}
+              onChange={(e) => setAiUrlInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  onUpdateProject({ aiUrl: aiUrlInput.trim() || undefined });
+                  setEditingAiUrl(false);
+                }
+                if (e.key === "Escape") setEditingAiUrl(false);
+              }}
+              placeholder="https://notebooklm.google.com/..."
+              className="flex-1 px-3 py-1.5 rounded-lg bg-input/40 border border-white/10 text-xs focus:border-primary/40 focus:outline-none"
+            />
+            <button
+              onClick={() => { onUpdateProject({ aiUrl: aiUrlInput.trim() || undefined }); setEditingAiUrl(false); }}
+              className="px-2 py-1.5 rounded-lg bg-primary/15 border border-primary/40 text-primary text-xs font-semibold hover:bg-primary/25 transition"
+            >
+              저장
+            </button>
+            <button
+              onClick={() => setEditingAiUrl(false)}
+              className="px-2 py-1.5 rounded-lg text-muted-foreground text-xs"
+            >
+              취소
+            </button>
+          </div>
+        )}
+
+        {/* 도구 바 */}
+        {((p.toolIds ?? []).length > 0 || showProjectPicker) && (
+          <div className="mt-3 relative">
+            <ToolChipBar
+              availableTools={availableTools}
+              toolIds={p.toolIds ?? []}
+              onRemove={onToggleProjectTool}
+              onAdd={() => setShowProjectPicker((v) => !v)}
+            />
+            {showProjectPicker && (
+              <ToolPicker
+                availableTools={availableTools}
+                selectedIds={p.toolIds ?? []}
+                onToggle={onToggleProjectTool}
+                onClose={() => setShowProjectPicker(false)}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
