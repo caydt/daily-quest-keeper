@@ -12,19 +12,24 @@ import {
   Sparkles,
   CalendarDays,
   GripVertical,
-  Crown,
   X,
   ChevronDown,
   ChevronRight,
   Pencil,
   MoveRight,
+  ExternalLink,
+  Link2,
 } from "lucide-react";
+import { ToolChipBar } from "@/components/garden/ToolChipBar";
+import { ToolPicker } from "@/components/garden/ToolPicker";
+import type { Tool } from "@/lib/tools-sheet";
 
 type Props = {
   projects: Project[];
   farms: Farm[];
   tasks: Task[];
   totalXp: number;
+  availableTools: Tool[];
   onAdd: (title: string, description?: string, dueDate?: string) => void;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
@@ -32,8 +37,11 @@ type Props = {
   onAssignTask: (taskId: string, projectId: string | null) => void;
   onAddFarm: (title: string, icon?: string) => void;
   onDeleteFarm: (id: string) => void;
-  onUpdateFarm: (id: string, patch: { title?: string; icon?: string }) => void;
+  onUpdateFarm: (id: string, patch: { title?: string; icon?: string; aiUrl?: string; toolIds?: string[] }) => void;
   onMoveProjectToFarm: (projectId: string, farmId: string | null) => void;
+  onToggleFarmTool: (farmId: string, toolId: string) => void;
+  onToggleProjectTool: (projectId: string, toolId: string) => void;
+  onUpdateProject: (id: string, patch: { aiUrl?: string }) => void;
 };
 
 // ── 나무 성장 단계 컴포넌트
@@ -55,19 +63,25 @@ function ProjectCard({
   childTasks,
   rewardXp,
   farms,
+  availableTools,
   onToggle,
   onDelete,
   onUnassign,
   onMoveToFarm,
+  onToggleProjectTool,
+  onUpdateProject,
 }: {
   p: Project;
   childTasks: Task[];
   rewardXp: number;
   farms: Farm[];
+  availableTools: Tool[];
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onUnassign: (taskId: string) => void;
   onMoveToFarm: (farmId: string | null) => void;
+  onToggleProjectTool: (toolId: string) => void;
+  onUpdateProject: (patch: { aiUrl?: string }) => void;
 }) {
   const sortable = useSortable({ id: p.id, data: { type: "project", project: p } });
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = sortable;
@@ -259,31 +273,41 @@ function FarmCard({
   tasks,
   rewardXp,
   allFarms,
+  availableTools,
   onToggleProject,
   onDeleteProject,
   onDeleteFarm,
   onUpdateFarm,
+  onToggleFarmTool,
   onUnassign,
   onMoveProjectToFarm,
   onAddProjectToFarm,
+  onToggleProjectTool,
+  onUpdateProject,
 }: {
   farm: Farm;
   trees: Project[];
   tasks: Task[];
   rewardXp: number;
   allFarms: Farm[];
+  availableTools: Tool[];
   onToggleProject: (id: string) => void;
   onDeleteProject: (id: string) => void;
   onDeleteFarm: (id: string) => void;
-  onUpdateFarm: (id: string, patch: { title?: string; icon?: string }) => void;
+  onUpdateFarm: (id: string, patch: { title?: string; icon?: string; aiUrl?: string; toolIds?: string[] }) => void;
+  onToggleFarmTool: (toolId: string) => void;
   onUnassign: (taskId: string) => void;
   onMoveProjectToFarm: (projectId: string, farmId: string | null) => void;
   onAddProjectToFarm: (farmId: string) => void;
+  onToggleProjectTool: (projectId: string, toolId: string) => void;
+  onUpdateProject: (id: string, patch: { aiUrl?: string }) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(farm.title);
   const [editIcon, setEditIcon] = useState(farm.icon ?? "🌾");
+  const [editAiUrl, setEditAiUrl] = useState(farm.aiUrl ?? "");
+  const [showFarmPicker, setShowFarmPicker] = useState(false);
 
   // 농장 성장 계산
   const treeStats = trees.map(p => {
@@ -313,7 +337,7 @@ function FarmCard({
             className="flex items-center gap-2 flex-1"
             onSubmit={(e) => {
               e.preventDefault();
-              onUpdateFarm(farm.id, { title: editTitle, icon: editIcon });
+              onUpdateFarm(farm.id, { title: editTitle, icon: editIcon, aiUrl: editAiUrl.trim() || undefined });
               setEditing(false);
             }}
           >
@@ -328,6 +352,13 @@ function FarmCard({
               onChange={e => setEditTitle(e.target.value)}
               className="flex-1 bg-input/40 border border-white/10 rounded-lg px-2 py-1 text-sm"
               autoFocus
+            />
+            <input
+              value={editAiUrl}
+              onChange={(e) => setEditAiUrl(e.target.value)}
+              placeholder="AI URL (NotebookLM, ChatGPT 등, 선택)"
+              className="flex-1 bg-input/40 border border-white/10 rounded-lg px-2 py-1 text-sm mt-1"
+              type="url"
             />
             <button type="submit" className="text-xs text-primary font-semibold px-2">저장</button>
             <button type="button" onClick={() => setEditing(false)} className="text-xs text-muted-foreground px-1">취소</button>
@@ -347,6 +378,18 @@ function FarmCard({
         )}
 
         <div className="flex items-center gap-1 shrink-0">
+          {farm.aiUrl && (
+            <a
+              href={farm.aiUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded-lg hover:bg-white/5 text-emerald-400 hover:text-emerald-300 transition"
+              title="AI 열기"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ExternalLink className="size-3.5" />
+            </a>
+          )}
           <button
             onClick={() => setEditing(v => !v)}
             className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition"
@@ -371,6 +414,24 @@ function FarmCard({
         </div>
       </div>
 
+      {/* 도구 바 */}
+      <div className="px-5 py-2 border-b border-emerald-500/10 relative">
+        <ToolChipBar
+          availableTools={availableTools}
+          toolIds={farm.toolIds ?? []}
+          onRemove={(toolId) => onToggleFarmTool(toolId)}
+          onAdd={() => setShowFarmPicker((v) => !v)}
+        />
+        {showFarmPicker && (
+          <ToolPicker
+            availableTools={availableTools}
+            selectedIds={farm.toolIds ?? []}
+            onToggle={(toolId) => onToggleFarmTool(toolId)}
+            onClose={() => setShowFarmPicker(false)}
+          />
+        )}
+      </div>
+
       {/* 나무 목록 */}
       {!collapsed && (
         <div className="p-4 space-y-2.5">
@@ -393,10 +454,13 @@ function FarmCard({
                   childTasks={tasks.filter(t => t.projectId === p.id)}
                   rewardXp={rewardXp}
                   farms={allFarms}
+                  availableTools={availableTools}
                   onToggle={onToggleProject}
                   onDelete={onDeleteProject}
                   onUnassign={onUnassign}
                   onMoveToFarm={(farmId) => onMoveProjectToFarm(p.id, farmId)}
+                  onToggleProjectTool={(toolId) => onToggleProjectTool(p.id, toolId)}
+                  onUpdateProject={(patch) => onUpdateProject(p.id, patch)}
                 />
               ))}
             </SortableContext>
@@ -413,6 +477,7 @@ export function ProjectList({
   farms,
   tasks,
   totalXp,
+  availableTools,
   onAdd,
   onToggle,
   onDelete,
@@ -422,6 +487,9 @@ export function ProjectList({
   onDeleteFarm,
   onUpdateFarm,
   onMoveProjectToFarm,
+  onToggleFarmTool,
+  onToggleProjectTool,
+  onUpdateProject,
 }: Props) {
   const [showAddProject, setShowAddProject] = useState(false);
   const [addingToFarmId, setAddingToFarmId] = useState<string | null>(null);
@@ -582,16 +650,20 @@ export function ProjectList({
           tasks={tasks}
           rewardXp={rewardXp}
           allFarms={farms}
+          availableTools={availableTools}
           onToggleProject={onToggle}
           onDeleteProject={onDelete}
           onDeleteFarm={onDeleteFarm}
           onUpdateFarm={onUpdateFarm}
+          onToggleFarmTool={(toolId) => onToggleFarmTool(farm.id, toolId)}
           onUnassign={(taskId) => onAssignTask(taskId, null)}
           onMoveProjectToFarm={onMoveProjectToFarm}
           onAddProjectToFarm={(farmId) => {
             setAddingToFarmId(farmId);
             setShowAddProject(true);
           }}
+          onToggleProjectTool={onToggleProjectTool}
+          onUpdateProject={onUpdateProject}
         />
       ))}
 
@@ -612,10 +684,13 @@ export function ProjectList({
                   childTasks={tasks.filter(t => t.projectId === p.id)}
                   rewardXp={rewardXp}
                   farms={farms}
+                  availableTools={availableTools}
                   onToggle={onToggle}
                   onDelete={onDelete}
                   onUnassign={(taskId) => onAssignTask(taskId, null)}
                   onMoveToFarm={(farmId) => onMoveProjectToFarm(p.id, farmId)}
+                  onToggleProjectTool={(toolId) => onToggleProjectTool(p.id, toolId)}
+                  onUpdateProject={(patch) => onUpdateProject(p.id, patch)}
                 />
               ))}
             </div>
