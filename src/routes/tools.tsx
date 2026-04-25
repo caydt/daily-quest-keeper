@@ -52,7 +52,7 @@ function ToolsPage() {
   const sheetUrl = state.settings.toolsSheetUrl;
   const { tools: sheetTools, loading, error, fetchedAt, refresh } = useToolsSheet(sheetUrl);
 
-  const [tab, setTab] = useState<Tab>("local");
+  const [tab, setTab] = useState<Tab>("sheet");
   const [q, setQ] = useState("");
   const [activeCat, setActiveCat] = useState<string | null>(null);
   const [attachOpenFor, setAttachOpenFor] = useState<string | null>(null);
@@ -162,16 +162,16 @@ function ToolsPage() {
         {/* 탭 */}
         <div className="flex gap-2 border-b border-white/5 pb-1">
           <TabBtn
-            active={tab === "local"}
-            icon={<LayoutList className="size-3.5" />}
-            label={`직접 등록 (${state.localTools.length})`}
-            onClick={() => { setTab("local"); setActiveCat(null); }}
-          />
-          <TabBtn
             active={tab === "sheet"}
             icon={<Database className="size-3.5" />}
             label={`구글 시트 (${sheetTools.length})`}
             onClick={() => { setTab("sheet"); setActiveCat(null); }}
+          />
+          <TabBtn
+            active={tab === "local"}
+            icon={<LayoutList className="size-3.5" />}
+            label={`직접 등록 (${state.localTools.length})`}
+            onClick={() => { setTab("local"); setActiveCat(null); }}
           />
         </div>
 
