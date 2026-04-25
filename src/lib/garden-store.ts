@@ -53,6 +53,8 @@ export type Farm = {
   icon?: string;   // 농장 대표 이모지
   createdAt: number;
   order: number;
+  toolIds?: string[];
+  aiUrl?: string;
 };
 
 export type Project = {
@@ -66,6 +68,7 @@ export type Project = {
   order: number;
   toolIds?: string[]; // 첨부된 도구 ID들
   farmId?: string | null; // 속한 농장 ID (null = 독립 나무)
+  aiUrl?: string;
 };
 
 // 나무 성장 단계 (서브태스크 완료율 기반)
@@ -672,6 +675,13 @@ export function useGarden() {
     }));
   }, []);
 
+  const updateProject = useCallback((id: string, patch: Partial<Pick<Project, "aiUrl" | "title" | "description" | "dueDate">>) => {
+    setState((s) => ({
+      ...s,
+      projects: s.projects.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    }));
+  }, []);
+
   const reorderProjects = useCallback((orderedIds: string[]) => {
     setState((s) => {
       const map = new Map(orderedIds.map((id, i) => [id, i]));
@@ -745,10 +755,24 @@ export function useGarden() {
     }));
   }, []);
 
-  const updateFarm = useCallback((id: string, patch: Partial<Pick<Farm, "title" | "icon">>) => {
+  const updateFarm = useCallback((id: string, patch: Partial<Pick<Farm, "title" | "icon" | "aiUrl" | "toolIds">>) => {
     setState((s) => ({
       ...s,
       farms: s.farms.map((f) => (f.id === id ? { ...f, ...patch } : f)),
+    }));
+  }, []);
+
+  const toggleFarmTool = useCallback((farmId: string, toolId: string) => {
+    setState((s) => ({
+      ...s,
+      farms: s.farms.map((f) => {
+        if (f.id !== farmId) return f;
+        const cur = f.toolIds ?? [];
+        return {
+          ...f,
+          toolIds: cur.includes(toolId) ? cur.filter((x) => x !== toolId) : [...cur, toolId],
+        };
+      }),
     }));
   }, []);
 
@@ -858,7 +882,9 @@ export function useGarden() {
     addFarm,
     deleteFarm,
     updateFarm,
+    toggleFarmTool,
     moveProjectToFarm,
+    updateProject,
     setCondition,
     addLocalTool,
     updateLocalTool,
