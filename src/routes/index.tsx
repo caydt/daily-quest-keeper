@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useGarden, todayStr, filterTasksByCondition, CONDITION_META } from "@/lib/garden-store";
+import { useToolsSheet } from "@/lib/tools-sheet";
 import type { ConditionMode } from "@/lib/garden-store";
 import { useReminders, requestNotificationPermission } from "@/lib/notifications";
 import { Avatar } from "@/components/garden/Avatar";
@@ -62,7 +63,12 @@ function Index() {
     deleteFarm,
     updateFarm,
     moveProjectToFarm,
+    toggleFarmTool,
+    toggleProjectTool,
+    updateProject,
   } = useGarden();
+  const { tools: sheetTools } = useToolsSheet(state.settings.toolsSheetUrl ?? "");
+  const availableTools = useMemo(() => [...(state.localTools ?? []), ...sheetTools], [state.localTools, sheetTools]);
   const today = todayStr();
   const todaysTasks = state.tasks.filter((t) => t.date === today);
   const standalone = todaysTasks.filter((t) => !t.projectId);
@@ -217,6 +223,7 @@ function Index() {
                 farms={state.farms}
                 tasks={state.tasks}
                 totalXp={state.totalXp}
+                availableTools={availableTools}
                 onAdd={addProject}
                 onToggle={toggleProject}
                 onDelete={deleteProject}
@@ -226,6 +233,9 @@ function Index() {
                 onDeleteFarm={deleteFarm}
                 onUpdateFarm={updateFarm}
                 onMoveProjectToFarm={moveProjectToFarm}
+                onToggleFarmTool={toggleFarmTool}
+                onToggleProjectTool={toggleProjectTool}
+                onUpdateProject={updateProject}
               />
               <TaskList
                 tasks={visibleStandalone}
