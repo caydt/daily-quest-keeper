@@ -410,7 +410,7 @@ function FarmCard({
   onToggleFarmTool,
   onUnassign,
   onMoveProjectToFarm,
-  onAddProjectToFarm,
+  onAddTree,
   onToggleProjectTool,
   onUpdateProject,
   settings,
@@ -429,7 +429,7 @@ function FarmCard({
   onToggleFarmTool: (toolId: string) => void;
   onUnassign: (taskId: string) => void;
   onMoveProjectToFarm: (projectId: string, farmId: string | null) => void;
-  onAddProjectToFarm: (farmId: string) => void;
+  onAddTree: (farmId: string, title: string) => void;
   onToggleProjectTool: (projectId: string, toolId: string) => void;
   onUpdateProject: (id: string, patch: { aiUrl?: string }) => void;
   settings: Settings;
@@ -442,6 +442,8 @@ function FarmCard({
   const [editAiUrl, setEditAiUrl] = useState(farm.aiUrl ?? "");
   const [showFarmPicker, setShowFarmPicker] = useState(false);
   const [showAiChat, setShowAiChat] = useState(false);
+  const [showInlineAdd, setShowInlineAdd] = useState(false);
+  const [inlineTitle, setInlineTitle] = useState("");
 
   // 농장 성장 계산
   const treeStats = trees.map(p => {
@@ -541,7 +543,7 @@ function FarmCard({
             <Pencil className="size-3.5" />
           </button>
           <button
-            onClick={() => onAddProjectToFarm(farm.id)}
+            onClick={() => { setShowInlineAdd(v => !v); setInlineTitle(""); }}
             className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-400 transition"
             title="이 농장에 나무 추가"
           >
@@ -575,6 +577,43 @@ function FarmCard({
         )}
       </div>
 
+      {/* 인라인 나무 추가 폼 */}
+      {showInlineAdd && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const t = inlineTitle.trim();
+            if (!t) return;
+            onAddTree(farm.id, t);
+            setInlineTitle("");
+            setShowInlineAdd(false);
+          }}
+          className="px-4 py-3 border-b border-emerald-500/10 flex items-center gap-2"
+        >
+          <input
+            autoFocus
+            value={inlineTitle}
+            onChange={(e) => setInlineTitle(e.target.value)}
+            placeholder="나무 이름 입력..."
+            className="flex-1 bg-input/40 border border-emerald-500/20 rounded-lg px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none"
+            onKeyDown={(e) => { if (e.key === "Escape") { setShowInlineAdd(false); setInlineTitle(""); } }}
+          />
+          <button
+            type="submit"
+            className="px-3 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/30 transition"
+          >
+            심기 🌱
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowInlineAdd(false); setInlineTitle(""); }}
+            className="px-2 py-2 rounded-lg text-muted-foreground text-xs hover:bg-white/5 transition"
+          >
+            취소
+          </button>
+        </form>
+      )}
+
       {/* AI 채팅 패널 */}
       {showAiChat && (
         <div className="px-4 py-3 border-b border-emerald-500/10">
@@ -594,7 +633,7 @@ function FarmCard({
             <p className="text-center text-muted-foreground text-sm py-6">
               아직 나무가 없어요. 프로젝트를 이 농장으로 옮기거나{" "}
               <button
-                onClick={() => onAddProjectToFarm(farm.id)}
+                onClick={() => { setShowInlineAdd(true); setInlineTitle(""); }}
                 className="text-emerald-400 underline underline-offset-2"
               >
                 새 나무를 심어보세요
@@ -810,10 +849,7 @@ export function ProjectList({
           onToggleFarmTool={(toolId) => onToggleFarmTool(farm.id, toolId)}
           onUnassign={(taskId) => onAssignTask(taskId, null)}
           onMoveProjectToFarm={onMoveProjectToFarm}
-          onAddProjectToFarm={(farmId) => {
-            setAddingToFarmId(farmId);
-            setShowAddProject(true);
-          }}
+          onAddTree={(farmId, title) => onAdd(title, undefined, undefined, farmId)}
           onToggleProjectTool={onToggleProjectTool}
           onUpdateProject={onUpdateProject}
           settings={settings}
