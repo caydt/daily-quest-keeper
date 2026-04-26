@@ -221,18 +221,28 @@ function ProjectCard({
               </div>
             )}
 
-            {!p.completed && (
-              <button
-                type="button"
-                onClick={() => { setShowSubTaskAdd(true); setSubTaskTitle(""); }}
-                className="mt-2 w-full text-[10px] text-muted-foreground/60 italic border border-dashed border-white/10 hover:border-accent/30 hover:text-accent/70 rounded-lg px-2 py-1.5 text-center transition"
-              >
-                {total === 0 ? "+ 할일 추가 (또는 끌어다 놓기)" : "+ 할일 추가"}
-              </button>
+            {!p.completed && total === 0 && !showSubTaskAdd && (
+              <p className="mt-2 text-[10px] text-muted-foreground/50 italic text-center">
+                위 + 버튼으로 할일 추가, 또는 끌어다 놓기
+              </p>
             )}
           </div>
 
           {/* 액션 버튼들 */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* 할일 추가 — 항상 보임 */}
+            {!p.completed && (
+              <button
+                onClick={() => { setShowSubTaskAdd((v) => !v); setSubTaskTitle(""); }}
+                className={`p-1.5 rounded-lg transition text-sm font-bold ${showSubTaskAdd ? "bg-accent/20 text-accent" : "bg-accent/10 text-accent hover:bg-accent/20"}`}
+                title="할일 추가"
+                aria-label="할일 추가"
+              >
+                <Plus className="size-4" />
+              </button>
+            )}
+          </div>
+          {/* 나머지 액션 버튼들 (hover 시) */}
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
             {/* AI 채팅 버튼 */}
             {(settings.aiChatEnabled ?? true) && (
