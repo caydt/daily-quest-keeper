@@ -44,19 +44,18 @@ export function useReminders(tasks: Task[], settings: Settings, enabled: boolean
       const morningKey = `${today}-morning`;
       if (cur === settings.morningTime && !fired[morningKey]) {
         const todays = tasks.filter((t) => t.date === today && !t.completed);
-        notify("🌅 오늘의 정원", `오늘 가꿀 일 ${todays.length}개가 기다리고 있어요.`);
+        const defaultMorning = `오늘 가꿀 일 ${todays.length}개가 기다리고 있어요.`;
+        notify("🌅 오늘의 정원", settings.morningMessage || defaultMorning);
         fired[morningKey] = true;
       }
       const eveningKey = `${today}-evening`;
       if (cur === settings.eveningTime && !fired[eveningKey]) {
         const remaining = tasks.filter((t) => t.date === today && !t.completed);
         const must = remaining.filter((t) => t.kind === "must").length;
-        notify(
-          "🌙 저녁 회고",
-          remaining.length > 0
-            ? `미완료 ${remaining.length}개 (필수 ${must}). 자정 전에 완료하세요.`
-            : "오늘의 정원이 완벽하게 피었습니다 ✨",
-        );
+        const defaultEvening = remaining.length > 0
+          ? `미완료 ${remaining.length}개 (필수 ${must}). 자정 전에 완료하세요.`
+          : "오늘의 정원이 완벽하게 피었습니다 ✨";
+        notify("🌙 저녁 회고", settings.eveningMessage || defaultEvening);
         fired[eveningKey] = true;
       }
       for (const t of tasks) {

@@ -178,6 +178,34 @@ function SettingsPage() {
             />
           </label>
 
+          {/* 아침 문구 */}
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground flex items-center gap-1">
+              <Sunrise className="size-3" /> 아침 알림 문구 <span className="text-muted-foreground/50">(비워두면 기본값)</span>
+            </label>
+            <input
+              type="text"
+              value={state.settings.morningMessage ?? ""}
+              onChange={(e) => updateSettings({ morningMessage: e.target.value || undefined })}
+              placeholder="오늘 가꿀 일 N개가 기다리고 있어요."
+              className="w-full px-3 py-2 rounded-xl bg-input/40 border border-white/10 text-sm focus:border-primary/40 focus:outline-none"
+            />
+          </div>
+
+          {/* 저녁 문구 */}
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground flex items-center gap-1">
+              <Moon className="size-3" /> 저녁 알림 문구 <span className="text-muted-foreground/50">(비워두면 기본값)</span>
+            </label>
+            <input
+              type="text"
+              value={state.settings.eveningMessage ?? ""}
+              onChange={(e) => updateSettings({ eveningMessage: e.target.value || undefined })}
+              placeholder="미완료 N개 남았어요. 자정 전에 완료하세요."
+              className="w-full px-3 py-2 rounded-xl bg-input/40 border border-white/10 text-sm focus:border-primary/40 focus:outline-none"
+            />
+          </div>
+
           <p className="text-xs text-muted-foreground">
             할일 자체의 알람은 각 할일에 설정한 시간으로 자동 발송됩니다.
           </p>
@@ -264,6 +292,12 @@ function SettingsPage() {
             </div>
           )}
 
+          <div className="rounded-2xl bg-amber-500/5 border border-amber-500/20 p-4 text-xs text-amber-200/80 space-y-1">
+            <p className="font-semibold text-amber-300">⚠️ 다른 기기에서 연동하려면</p>
+            <p>Script URL은 기기마다 직접 입력해야 합니다. 위 URL을 다른 기기의 설정 페이지에도 붙여넣고 저장하세요.</p>
+            <p className="pt-1 text-amber-200/60">연동이 안 된다면 → Apps Script 배포 시 <strong className="text-amber-300">액세스: 모든 사용자 (로그인 불필요)</strong> 로 설정했는지 확인하세요.</p>
+          </div>
+
           <div className="rounded-2xl bg-background/40 border border-white/10 p-4 text-xs text-muted-foreground space-y-2">
             <div className="font-semibold text-foreground">⚙️ Apps Script 배포 방법</div>
             <ol className="space-y-1 list-decimal list-inside">
@@ -296,8 +330,9 @@ function doPost(e) {
 }`}</pre>
             <ol start={3} className="space-y-1 list-decimal list-inside">
               <li>배포 → 새 배포 → 유형: 웹앱</li>
-              <li>실행: 나 / 액세스: 모든 사용자</li>
+              <li><strong className="text-foreground">실행: 나 / 액세스: 모든 사용자 (로그인 불필요)</strong></li>
               <li>배포 후 URL 복사해서 위에 붙여넣기</li>
+              <li className="text-rose-400/80">⚠️ "Google 계정이 있는 사용자"로 설정하면 다른 기기에서 막힙니다</li>
             </ol>
           </div>
         </section>

@@ -36,6 +36,8 @@ export type Task = {
 export type Settings = {
   morningTime: string; // "HH:MM"
   eveningTime: string;
+  morningMessage?: string; // 아침 알림 커스텀 문구
+  eveningMessage?: string; // 저녁 알림 커스텀 문구
   toolsSheetUrl?: string;
   aiProvider?: "gemini" | "openai" | "claude";
   aiApiKey?: string;
