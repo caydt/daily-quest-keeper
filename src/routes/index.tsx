@@ -11,7 +11,9 @@ import { QuestPanel } from "@/components/garden/QuestPanel";
 import { AchievementCodex } from "@/components/garden/AchievementCodex";
 import { SidePanels } from "@/components/garden/SidePanels";
 import { ConditionSelector } from "@/components/garden/ConditionSelector";
-import { Settings as SettingsIcon, BarChart3, Bell, BellOff, Wrench } from "lucide-react";
+import { AiSidePanel } from "@/components/AiSidePanel";
+import { PledgeBoard } from "@/components/PledgeBoard";
+import { Settings as SettingsIcon, BarChart3, Bell, BellOff, Wrench, Sparkles } from "lucide-react";
 import {
   DndContext,
   PointerSensor,
@@ -66,12 +68,15 @@ function Index() {
     toggleFarmTool,
     toggleProjectTool,
     updateProject,
+    setPledge,
   } = useGarden();
   const { tools: sheetTools } = useToolsSheet(state.settings.toolsSheetUrl ?? "");
   const availableTools = useMemo(() => [...(state.localTools ?? []), ...sheetTools], [state.localTools, sheetTools]);
   const today = todayStr();
   const todaysTasks = state.tasks.filter((t) => t.date === today);
   const standalone = todaysTasks.filter((t) => !t.projectId);
+  const todayPendingTasks = todaysTasks.filter((t) => !t.completed);
+  const [showAiPanel, setShowAiPanel] = useState(false);
 
   // 컨디션 필터 적용
   const visibleStandalone = todayCondition
@@ -141,6 +146,12 @@ function Index() {
     }
   };
 
+  const handleAddTasksToProject = (_projectId: string | null, titles: string[]) => {
+    for (const title of titles) {
+      addTask(title, "09:00", "medium", "flex");
+    }
+  };
+
   if (!hydrated) {
     return <div className="min-h-dvh" />;
   }
@@ -148,7 +159,22 @@ function Index() {
   return (
     <div className="min-h-dvh px-4 py-6 md:px-10 md:py-10">
       {/* 컨디션 미선택 시 오버레이 */}
-      {!todayCondition && <ConditionSelector onSelect={setCondition} />}
+      {!todayCondition && (
+        <ConditionSelector
+          onSelect={setCondition}
+          settings={state.settings}
+          pendingTasks={todayPendingTasks}
+        />
+      )}
+
+      <AiSidePanel
+        open={showAiPanel}
+        onClose={() => setShowAiPanel(false)}
+        projects={state.projects}
+        tasks={state.tasks}
+        settings={state.settings}
+        onAddTasksToProject={handleAddTasksToProject}
+      />
 
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Game HUD top bar */}
@@ -192,6 +218,15 @@ function Index() {
             >
               <BarChart3 className="size-3.5" /> <span className="hidden sm:inline">주간 회고</span>
             </Link>
+            {(state.settings.aiChatEnabled ?? true) && (
+              <button
+                onClick={() => setShowAiPanel(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 bg-card/60 hover:border-primary/40 text-xs font-medium text-muted-foreground hover:text-primary transition"
+                title="AI 어시스턴트"
+              >
+                <Sparkles className="size-3.5" /> <span className="hidden sm:inline">AI</span>
+              </button>
+            )}
             <Link
               to="/settings"
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 bg-card/60 hover:border-primary/40 text-xs font-medium text-muted-foreground hover:text-primary transition"
@@ -200,6 +235,9 @@ function Index() {
             </Link>
           </div>
         </header>
+
+        {/* 각오 보드 */}
+        <PledgeBoard pledges={state.pledges ?? []} onSet={setPledge} />
 
         {/* Avatar HUD */}
         <Avatar
@@ -236,6 +274,8 @@ function Index() {
                 onToggleFarmTool={toggleFarmTool}
                 onToggleProjectTool={toggleProjectTool}
                 onUpdateProject={updateProject}
+                settings={state.settings}
+                onAddTasksToProject={handleAddTasksToProject}
               />
               <TaskList
                 tasks={visibleStandalone}
