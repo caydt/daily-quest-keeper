@@ -22,7 +22,11 @@ import {
 } from "lucide-react";
 import { ToolChipBar } from "@/components/garden/ToolChipBar";
 import { ToolPicker } from "@/components/garden/ToolPicker";
+import { AiChatPanel } from "@/components/garden/AiChatPanel";
 import type { Tool } from "@/lib/tools-sheet";
+import type { Settings } from "@/lib/garden-store";
+import { buildProjectContext, buildFarmContext } from "@/lib/ai-context";
+import { MessageCircle } from "lucide-react";
 
 type Props = {
   projects: Project[];
@@ -42,6 +46,8 @@ type Props = {
   onToggleFarmTool: (farmId: string, toolId: string) => void;
   onToggleProjectTool: (projectId: string, toolId: string) => void;
   onUpdateProject: (id: string, patch: { aiUrl?: string }) => void;
+  settings: Settings;
+  onAddTasksToProject: (projectId: string | null, titles: string[]) => void;
 };
 
 // ── 나무 성장 단계 컴포넌트
@@ -70,6 +76,8 @@ function ProjectCard({
   onMoveToFarm,
   onToggleProjectTool,
   onUpdateProject,
+  settings,
+  onAddTasksToProject,
 }: {
   p: Project;
   childTasks: Task[];
@@ -82,6 +90,8 @@ function ProjectCard({
   onMoveToFarm: (farmId: string | null) => void;
   onToggleProjectTool: (toolId: string) => void;
   onUpdateProject: (patch: { aiUrl?: string }) => void;
+  settings: Settings;
+  onAddTasksToProject: (projectId: string | null, titles: string[]) => void;
 }) {
   const sortable = useSortable({ id: p.id, data: { type: "project", project: p } });
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = sortable;
@@ -93,6 +103,7 @@ function ProjectCard({
   const [showProjectPicker, setShowProjectPicker] = useState(false);
   const [editingAiUrl, setEditingAiUrl] = useState(false);
   const [aiUrlInput, setAiUrlInput] = useState(p.aiUrl ?? "");
+  const [showAiChat, setShowAiChat] = useState(false);
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -214,6 +225,16 @@ function ProjectCard({
 
           {/* 액션 버튼들 */}
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            {/* AI 채팅 버튼 */}
+            {(settings.aiChatEnabled ?? true) && (
+              <button
+                onClick={() => setShowAiChat((v) => !v)}
+                className={`p-1.5 rounded-lg hover:bg-white/5 transition ${showAiChat ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
+                title="AI와 대화"
+              >
+                <MessageCircle className="size-3.5" />
+              </button>
+            )}
             {/* AI URL */}
             <div className="relative">
               {p.aiUrl ? (
@@ -357,6 +378,18 @@ function ProjectCard({
             )}
           </div>
         )}
+
+        {/* AI 채팅 패널 */}
+        {showAiChat && (
+          <div className="mt-3">
+            <AiChatPanel
+              initialContext={buildProjectContext(p, childTasks)}
+              settings={settings}
+              onAddTasks={(titles) => onAddTasksToProject(p.id, titles)}
+              onClose={() => setShowAiChat(false)}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -380,6 +413,8 @@ function FarmCard({
   onAddProjectToFarm,
   onToggleProjectTool,
   onUpdateProject,
+  settings,
+  onAddTasksToProject,
 }: {
   farm: Farm;
   trees: Project[];
@@ -397,6 +432,8 @@ function FarmCard({
   onAddProjectToFarm: (farmId: string) => void;
   onToggleProjectTool: (projectId: string, toolId: string) => void;
   onUpdateProject: (id: string, patch: { aiUrl?: string }) => void;
+  settings: Settings;
+  onAddTasksToProject: (projectId: string | null, titles: string[]) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -404,6 +441,7 @@ function FarmCard({
   const [editIcon, setEditIcon] = useState(farm.icon ?? "🌾");
   const [editAiUrl, setEditAiUrl] = useState(farm.aiUrl ?? "");
   const [showFarmPicker, setShowFarmPicker] = useState(false);
+  const [showAiChat, setShowAiChat] = useState(false);
 
   // 농장 성장 계산
   const treeStats = trees.map(p => {
@@ -474,6 +512,15 @@ function FarmCard({
         )}
 
         <div className="flex items-center gap-1 shrink-0">
+          {(settings.aiChatEnabled ?? true) && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowAiChat((v) => !v); }}
+              className={`p-1.5 rounded-lg hover:bg-white/5 transition ${showAiChat ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
+              title="AI와 대화"
+            >
+              <MessageCircle className="size-3.5" />
+            </button>
+          )}
           {farm.aiUrl && (
             <a
               href={farm.aiUrl}
@@ -528,6 +575,18 @@ function FarmCard({
         )}
       </div>
 
+      {/* AI 채팅 패널 */}
+      {showAiChat && (
+        <div className="px-4 py-3 border-b border-emerald-500/10">
+          <AiChatPanel
+            initialContext={buildFarmContext(farm, trees, tasks)}
+            settings={settings}
+            onAddTasks={(titles) => onAddTasksToProject(null, titles)}
+            onClose={() => setShowAiChat(false)}
+          />
+        </div>
+      )}
+
       {/* 나무 목록 */}
       {!collapsed && (
         <div className="p-4 space-y-2.5">
@@ -557,6 +616,8 @@ function FarmCard({
                   onMoveToFarm={(farmId) => onMoveProjectToFarm(p.id, farmId)}
                   onToggleProjectTool={(toolId) => onToggleProjectTool(p.id, toolId)}
                   onUpdateProject={(patch) => onUpdateProject(p.id, patch)}
+                  settings={settings}
+                  onAddTasksToProject={onAddTasksToProject}
                 />
               ))}
             </SortableContext>
@@ -586,6 +647,8 @@ export function ProjectList({
   onToggleFarmTool,
   onToggleProjectTool,
   onUpdateProject,
+  settings,
+  onAddTasksToProject,
 }: Props) {
   const [showAddProject, setShowAddProject] = useState(false);
   const [addingToFarmId, setAddingToFarmId] = useState<string | null>(null);
@@ -760,6 +823,8 @@ export function ProjectList({
           }}
           onToggleProjectTool={onToggleProjectTool}
           onUpdateProject={onUpdateProject}
+          settings={settings}
+          onAddTasksToProject={onAddTasksToProject}
         />
       ))}
 
@@ -787,6 +852,8 @@ export function ProjectList({
                   onMoveToFarm={(farmId) => onMoveProjectToFarm(p.id, farmId)}
                   onToggleProjectTool={(toolId) => onToggleProjectTool(p.id, toolId)}
                   onUpdateProject={(patch) => onUpdateProject(p.id, patch)}
+                  settings={settings}
+                  onAddTasksToProject={onAddTasksToProject}
                 />
               ))}
             </div>
