@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- 배경 -->
+  <rect width="32" height="32" rx="8" fill="#1a0a2e"/>
+  <!-- 줄기 -->
+  <line x1="16" y1="26" x2="16" y2="16" stroke="#86efac" stroke-width="2" stroke-linecap="round"/>
+  <!-- 왼쪽 잎 -->
+  <path d="M16 20 Q10 16 11 10 Q15 13 16 20Z" fill="#4ade80"/>
+  <!-- 오른쪽 잎 -->
+  <path d="M16 18 Q22 14 21 8 Q17 11 16 18Z" fill="#86efac"/>
+  <!-- 흙 -->
+  <rect x="9" y="25" width="14" height="3" rx="1.5" fill="#713f12" opacity="0.8"/>
+</svg>
