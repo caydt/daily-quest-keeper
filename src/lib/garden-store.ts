@@ -610,6 +610,29 @@ export function useGarden() {
     }));
   }, []);
 
+  // 프로젝트 서브태스크 직접 추가
+  const addSubTask = useCallback((projectId: string, title: string, difficulty: Task["difficulty"] = "medium", kind: TaskKind = "flex") => {
+    setState((s) => ({
+      ...s,
+      tasks: [
+        ...s.tasks,
+        {
+          id: crypto.randomUUID(),
+          title,
+          time: "09:00",
+          difficulty,
+          kind,
+          completed: false,
+          createdAt: Date.now(),
+          date: todayStr(),
+          postponedCount: 0,
+          order: s.tasks.length,
+          projectId,
+        },
+      ],
+    }));
+  }, []);
+
   // 할일 순서 재정렬
   const reorderTasks = useCallback((orderedIds: string[]) => {
     setState((s) => {
@@ -729,8 +752,24 @@ export function useGarden() {
       const wasCompleted = project.completed;
       const today = todayStr();
 
-      const { currentXp, nextXp } = levelFromXp(s.totalXp);
-      const reward = Math.max(1, nextXp - currentXp);
+      // 서브태스크가 있어야 진짜 프로젝트 → 즉시 레벨업
+      // 서브태스크 없으면 단순 나무 → 일반 XP만 (레벨업 없음)
+      const childTasks = s.tasks.filter((t) => t.projectId === id);
+      const isRealProject = childTasks.length > 0;
+
+      let delta: number;
+      if (isRealProject) {
+        // 진짜 프로젝트: 현재 레벨 남은 XP 전부 채워 즉시 레벨업
+        const { currentXp, nextXp } = levelFromXp(s.totalXp);
+        const reward = Math.max(1, nextXp - currentXp);
+        delta = wasCompleted ? -reward : reward;
+      } else {
+        // 단순 나무: medium XP(45), 레벨 경계 못 넘도록 캡
+        const baseReward = XP_REWARD.medium;
+        const { currentXp, nextXp } = levelFromXp(s.totalXp);
+        const headroom = Math.max(0, nextXp - currentXp - 1);
+        delta = wasCompleted ? -baseReward : Math.min(baseReward, headroom);
+      }
 
       const projects = s.projects.map((p) =>
         p.id === id
@@ -738,7 +777,6 @@ export function useGarden() {
           : p,
       );
 
-      const delta = wasCompleted ? -reward : reward;
       const newXp = Math.max(0, s.xp + delta);
       const newTotal = Math.max(0, s.totalXp + delta);
 
@@ -905,6 +943,7 @@ export function useGarden() {
     saveNow,
     todayCondition,
     addTask,
+    addSubTask,
     toggleTask,
     deleteTask,
     postponeTask,

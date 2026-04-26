@@ -46,6 +46,7 @@ type Props = {
   onToggleFarmTool: (farmId: string, toolId: string) => void;
   onToggleProjectTool: (projectId: string, toolId: string) => void;
   onUpdateProject: (id: string, patch: { aiUrl?: string }) => void;
+  onAddSubTask: (projectId: string, title: string) => void;
   settings: Settings;
   onAddTasksToProject: (projectId: string | null, titles: string[]) => void;
 };
@@ -90,6 +91,7 @@ function ProjectCard({
   onMoveToFarm: (farmId: string | null) => void;
   onToggleProjectTool: (toolId: string) => void;
   onUpdateProject: (patch: { aiUrl?: string }) => void;
+  onAddSubTask: (projectId: string, title: string) => void;
   settings: Settings;
   onAddTasksToProject: (projectId: string | null, titles: string[]) => void;
 }) {
@@ -104,6 +106,8 @@ function ProjectCard({
   const [editingAiUrl, setEditingAiUrl] = useState(false);
   const [aiUrlInput, setAiUrlInput] = useState(p.aiUrl ?? "");
   const [showAiChat, setShowAiChat] = useState(false);
+  const [showSubTaskAdd, setShowSubTaskAdd] = useState(false);
+  const [subTaskTitle, setSubTaskTitle] = useState("");
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -173,10 +177,10 @@ function ProjectCard({
             {p.description && (
               <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{p.description}</p>
             )}
-            {!p.completed && (
+            {!p.completed && total > 0 && (
               <div className="text-[11px] text-primary/60 mt-1.5 flex items-center gap-1">
                 <Sparkles className="size-3" />
-                나무 완료 시 즉시 레벨업 🏆
+                프로젝트 완료 시 즉시 레벨업 🏆
               </div>
             )}
 
@@ -216,10 +220,14 @@ function ProjectCard({
               </div>
             )}
 
-            {!p.completed && total === 0 && (
-              <div className="mt-2 text-[10px] text-muted-foreground/70 italic border border-dashed border-white/10 rounded-lg px-2 py-1.5 text-center">
-                ↓ 할일을 여기에 끌어다 놓으면 서브 임무가 됩니다
-              </div>
+            {!p.completed && (
+              <button
+                type="button"
+                onClick={() => { setShowSubTaskAdd(true); setSubTaskTitle(""); }}
+                className="mt-2 w-full text-[10px] text-muted-foreground/60 italic border border-dashed border-white/10 hover:border-accent/30 hover:text-accent/70 rounded-lg px-2 py-1.5 text-center transition"
+              >
+                {total === 0 ? "+ 할일 추가 (또는 끌어다 놓기)" : "+ 할일 추가"}
+              </button>
             )}
           </div>
 
@@ -379,6 +387,43 @@ function ProjectCard({
           </div>
         )}
 
+        {/* 서브 할일 직접 추가 */}
+        {showSubTaskAdd && (
+          <form
+            className="mt-3 flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const t = subTaskTitle.trim();
+              if (!t) return;
+              onAddSubTask(p.id, t);
+              setSubTaskTitle("");
+              setShowSubTaskAdd(false);
+            }}
+          >
+            <input
+              autoFocus
+              value={subTaskTitle}
+              onChange={(e) => setSubTaskTitle(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Escape") { setShowSubTaskAdd(false); setSubTaskTitle(""); } }}
+              placeholder="할일 입력..."
+              className="flex-1 px-3 py-1.5 rounded-lg bg-input/40 border border-accent/20 text-xs focus:border-accent/50 focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="px-3 py-1.5 rounded-lg bg-accent/15 border border-accent/30 text-accent text-xs font-semibold hover:bg-accent/25 transition"
+            >
+              추가
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowSubTaskAdd(false); setSubTaskTitle(""); }}
+              className="px-2 py-1.5 rounded-lg text-muted-foreground text-xs"
+            >
+              취소
+            </button>
+          </form>
+        )}
+
         {/* AI 채팅 패널 */}
         {showAiChat && (
           <div className="mt-3">
@@ -430,6 +475,7 @@ function FarmCard({
   onUnassign: (taskId: string) => void;
   onMoveProjectToFarm: (projectId: string, farmId: string | null) => void;
   onAddTree: (farmId: string, title: string) => void;
+  onAddSubTask: (projectId: string, title: string) => void;
   onToggleProjectTool: (projectId: string, toolId: string) => void;
   onUpdateProject: (id: string, patch: { aiUrl?: string }) => void;
   settings: Settings;
@@ -655,6 +701,7 @@ function FarmCard({
                   onMoveToFarm={(farmId) => onMoveProjectToFarm(p.id, farmId)}
                   onToggleProjectTool={(toolId) => onToggleProjectTool(p.id, toolId)}
                   onUpdateProject={(patch) => onUpdateProject(p.id, patch)}
+                  onAddSubTask={onAddSubTask}
                   settings={settings}
                   onAddTasksToProject={onAddTasksToProject}
                 />
@@ -688,6 +735,7 @@ export function ProjectList({
   onUpdateProject,
   settings,
   onAddTasksToProject,
+  onAddSubTask,
 }: Props) {
   const [showAddProject, setShowAddProject] = useState(false);
   const [addingToFarmId, setAddingToFarmId] = useState<string | null>(null);
@@ -850,6 +898,7 @@ export function ProjectList({
           onUnassign={(taskId) => onAssignTask(taskId, null)}
           onMoveProjectToFarm={onMoveProjectToFarm}
           onAddTree={(farmId, title) => onAdd(title, undefined, undefined, farmId)}
+          onAddSubTask={onAddSubTask}
           onToggleProjectTool={onToggleProjectTool}
           onUpdateProject={onUpdateProject}
           settings={settings}
@@ -881,6 +930,7 @@ export function ProjectList({
                   onMoveToFarm={(farmId) => onMoveProjectToFarm(p.id, farmId)}
                   onToggleProjectTool={(toolId) => onToggleProjectTool(p.id, toolId)}
                   onUpdateProject={(patch) => onUpdateProject(p.id, patch)}
+                  onAddSubTask={onAddSubTask}
                   settings={settings}
                   onAddTasksToProject={onAddTasksToProject}
                 />

@@ -51,6 +51,7 @@ function Index() {
     todayCondition,
     setCondition,
     addTask,
+    addSubTask,
     toggleTask,
     deleteTask,
     postponeTask,
@@ -274,6 +275,7 @@ function Index() {
                 onToggleFarmTool={toggleFarmTool}
                 onToggleProjectTool={toggleProjectTool}
                 onUpdateProject={updateProject}
+                onAddSubTask={addSubTask}
                 settings={state.settings}
                 onAddTasksToProject={handleAddTasksToProject}
               />
