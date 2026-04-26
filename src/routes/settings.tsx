@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useGarden } from "@/lib/garden-store";
 import { requestNotificationPermission } from "@/lib/notifications";
 import { getScriptUrl, setScriptUrl, testScriptUrl } from "@/lib/sheets-adapter";
-import { ArrowLeft, Bell, BellOff, Sunrise, Moon, Wrench, ExternalLink, Link2, CheckCircle2, XCircle, Loader2, Save } from "lucide-react";
+import { ArrowLeft, Bell, BellOff, Sunrise, Moon, Wrench, ExternalLink, Link2, CheckCircle2, XCircle, Loader2, Save, Bot, ToggleLeft, ToggleRight } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -20,10 +20,55 @@ function SettingsPage() {
   const [scriptUrl, setScriptUrlState] = useState(() => getScriptUrl());
   const [testState, setTestState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [testError, setTestError] = useState("");
+  const [aiProvider, setAiProvider] = useState<"gemini" | "openai" | "claude">(
+    (state.settings.aiProvider as "gemini" | "openai" | "claude") ?? "gemini",
+  );
+  const [aiApiKey, setAiApiKey] = useState(state.settings.aiApiKey ?? "");
+  const [aiModel, setAiModel] = useState(state.settings.aiModel ?? "");
+  const [aiTestState, setAiTestState] = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [aiTestError, setAiTestError] = useState("");
 
   const handleSaveScriptUrl = () => {
     setScriptUrl(scriptUrl.trim());
     window.location.reload();
+  };
+
+  const handleTestAi = async () => {
+    if (!aiApiKey.trim()) {
+      setAiTestState("error");
+      setAiTestError("API 키를 입력해주세요.");
+      return;
+    }
+    setAiTestState("loading");
+    setAiTestError("");
+    try {
+      const { sendMessage } = await import("@/lib/ai-adapter");
+      const gen = sendMessage(
+        [{ role: "user", content: "안녕하세요! 연결 테스트입니다. 한 문장으로 응답해주세요." }],
+        { provider: aiProvider, apiKey: aiApiKey.trim(), model: aiModel.trim() || undefined },
+      );
+      let result = "";
+      for await (const chunk of gen) {
+        result += chunk;
+        if (result.length > 10) break;
+      }
+      if (result) {
+        setAiTestState("ok");
+      } else {
+        throw new Error("응답이 비어있어요.");
+      }
+    } catch (e: unknown) {
+      setAiTestState("error");
+      setAiTestError(e instanceof Error ? e.message : "알 수 없는 오류");
+    }
+  };
+
+  const handleSaveAiSettings = () => {
+    updateSettings({
+      aiProvider,
+      aiApiKey: aiApiKey.trim(),
+      aiModel: aiModel.trim() || undefined,
+    });
   };
 
   const handleTestUrl = async () => {
@@ -309,6 +354,128 @@ function doPost(e) {
             <ExternalLink className="size-4" /> 도구 탭 열기
           </Link>
         </section>
+        {/* AI 기능 설정 */}
+        <section className="bg-card/60 border border-white/10 rounded-3xl p-6 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="size-10 rounded-xl bg-gradient-bloom flex items-center justify-center shrink-0">
+              <Bot className="size-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <h2 className="font-semibold">AI 기능 설정</h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                Gemini 또는 OpenAI API 키를 입력하면 농장/나무 카드에서 AI와 대화하며 할일을 추가할 수 있어요.
+              </p>
+            </div>
+          </div>
+
+          {/* Provider 선택 */}
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">AI 제공자</label>
+            <select
+              value={aiProvider}
+              onChange={(e) => setAiProvider(e.target.value as "gemini" | "openai" | "claude")}
+              className="w-full px-3 py-2 rounded-xl bg-input/40 border border-white/10 text-sm focus:border-primary/40 focus:outline-none"
+            >
+              <option value="gemini">Gemini (Google)</option>
+              <option value="openai">OpenAI (ChatGPT)</option>
+              <option value="claude" disabled>Claude (Anthropic) — 준비 중</option>
+            </select>
+          </div>
+
+          {/* API 키 */}
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">API 키</label>
+            <input
+              type="password"
+              value={aiApiKey}
+              onChange={(e) => setAiApiKey(e.target.value)}
+              placeholder="API 키를 입력하세요"
+              className="w-full px-3 py-2.5 rounded-xl bg-input/40 border border-white/10 text-sm focus:border-primary/40 focus:outline-none"
+            />
+          </div>
+
+          {/* 모델 (선택사항) */}
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">모델 (선택사항, 비워두면 기본값 사용)</label>
+            <input
+              type="text"
+              value={aiModel}
+              onChange={(e) => setAiModel(e.target.value)}
+              placeholder={aiProvider === "gemini" ? "gemini-2.0-flash" : "gpt-4o-mini"}
+              className="w-full px-3 py-2.5 rounded-xl bg-input/40 border border-white/10 text-sm focus:border-primary/40 focus:outline-none"
+            />
+          </div>
+
+          {/* 저장 + 테스트 버튼 */}
+          <div className="flex gap-2">
+            <button
+              onClick={handleSaveAiSettings}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/15 border border-primary/40 text-primary text-sm font-semibold hover:bg-primary/25 transition"
+            >
+              <Save className="size-4" /> 저장
+            </button>
+            <button
+              onClick={() => void handleTestAi()}
+              disabled={aiTestState === "loading"}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 bg-card/60 hover:border-primary/40 text-sm text-muted-foreground hover:text-primary transition disabled:opacity-50"
+            >
+              {aiTestState === "loading" ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : aiTestState === "ok" ? (
+                <CheckCircle2 className="size-3.5 text-emerald-400" />
+              ) : aiTestState === "error" ? (
+                <XCircle className="size-3.5 text-rose-400" />
+              ) : (
+                <ExternalLink className="size-3.5" />
+              )}
+              연결 테스트
+            </button>
+          </div>
+          {aiTestState === "ok" && (
+            <p className="text-xs text-emerald-400">✓ 연결 성공! AI 기능을 사용할 수 있어요.</p>
+          )}
+          {aiTestState === "error" && aiTestError && (
+            <p className="text-xs text-rose-400">{aiTestError}</p>
+          )}
+
+          {/* 온오프 토글 */}
+          <div className="border-t border-white/5 pt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">AI 채팅</p>
+                <p className="text-[11px] text-muted-foreground">농장/나무 카드에서 AI와 대화하며 할일 추가</p>
+              </div>
+              <button
+                onClick={() => updateSettings({ aiChatEnabled: !(state.settings.aiChatEnabled ?? true) })}
+                className="text-primary hover:text-primary/80 transition"
+              >
+                {(state.settings.aiChatEnabled ?? true) ? (
+                  <ToggleRight className="size-8" />
+                ) : (
+                  <ToggleLeft className="size-8 text-muted-foreground" />
+                )}
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">AI 응원 메시지</p>
+                <p className="text-[11px] text-muted-foreground">컨디션 선택 시 미래 자아의 조언 생성 (OFF 시 기본 메시지)</p>
+              </div>
+              <button
+                onClick={() => updateSettings({ aiConditionMessageEnabled: !(state.settings.aiConditionMessageEnabled ?? true) })}
+                className="text-primary hover:text-primary/80 transition"
+              >
+                {(state.settings.aiConditionMessageEnabled ?? true) ? (
+                  <ToggleRight className="size-8" />
+                ) : (
+                  <ToggleLeft className="size-8 text-muted-foreground" />
+                )}
+              </button>
+            </div>
+          </div>
+        </section>
+
       </div>
     </div>
   );
