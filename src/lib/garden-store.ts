@@ -36,7 +36,12 @@ export type Task = {
 export type Settings = {
   morningTime: string; // "HH:MM"
   eveningTime: string;
-  toolsSheetUrl?: string; // 공개 구글 시트 URL (도구 라이브러리)
+  toolsSheetUrl?: string;
+  aiProvider?: "gemini" | "openai" | "claude";
+  aiApiKey?: string;
+  aiModel?: string;
+  aiChatEnabled?: boolean;
+  aiConditionMessageEnabled?: boolean;
 };
 
 export type DayLog = {
@@ -45,6 +50,11 @@ export type DayLog = {
   total: number;
   xpGained: number;
   xpLost: number;
+};
+
+export type Pledge = {
+  date: string; // YYYY-MM-DD
+  text: string;
 };
 
 export type Farm = {
@@ -121,6 +131,7 @@ export type GardenState = {
   condition: ConditionMode | null;     // 오늘 컨디션 (null = 아직 미선택)
   conditionSetOn: string | null;       // YYYY-MM-DD: 언제 설정했는지
   localTools: Tool[];                  // 앱 안에서 직접 등록한 도구들
+  pledges: Pledge[];
 };
 
 // 컨디션에 따라 오늘 태스크를 필터링
@@ -209,6 +220,7 @@ const initial: GardenState = {
   condition: null,
   conditionSetOn: null,
   localTools: [],
+  pledges: [],
 };
 
 const checkAchievements = (s: GardenState, ctx: { event?: string }): GardenState => {
@@ -269,7 +281,7 @@ export function useGarden() {
         let next: GardenState;
         if (!remote || Object.keys(remote).length === 0) {
           const local = await createLocalAdapter().load();
-          next = local ? { ...initial, ...local, settings: { ...initial.settings, ...(local.settings || {}) }, history: local.history || [], projects: local.projects || [], farms: local.farms || [], achievements: local.achievements || {}, localTools: local.localTools || [] } : initial;
+          next = local ? { ...initial, ...local, settings: { ...initial.settings, ...(local.settings || {}) }, history: local.history || [], projects: local.projects || [], farms: local.farms || [], achievements: local.achievements || {}, localTools: local.localTools || [], pledges: local.pledges || [] } : initial;
           if (scriptUrl && next !== initial) {
             await createSheetsAdapter(scriptUrl).save(next).catch(() => {});
           }
@@ -283,6 +295,7 @@ export function useGarden() {
             farms: remote.farms || [],
             achievements: remote.achievements || {},
             localTools: remote.localTools || [],
+            pledges: remote.pledges || [],
           };
         }
 
@@ -304,6 +317,7 @@ export function useGarden() {
           farms: local.farms || [],
           achievements: local.achievements || {},
           localTools: local.localTools || [],
+          pledges: local.pledges || [],
         } : initial);
         setHydrated(true);
         requestAnimationFrame(() => { isApplyingRemote.current = false; });
@@ -361,6 +375,7 @@ export function useGarden() {
           farms: remote.farms || [],
           achievements: remote.achievements || {},
           localTools: remote.localTools || [],
+          pledges: remote.pledges || [],
         }));
         requestAnimationFrame(() => { isApplyingRemote.current = false; });
       } catch {
@@ -832,6 +847,18 @@ export function useGarden() {
     }));
   }, []);
 
+  const setPledge = useCallback((text: string) => {
+    const today = todayStr();
+    setState((s) => {
+      const existing = s.pledges.findIndex((p) => p.date === today);
+      const pledges =
+        existing >= 0
+          ? s.pledges.map((p, i) => (i === existing ? { date: today, text } : p))
+          : [...s.pledges, { date: today, text }];
+      return { ...s, pledges };
+    });
+  }, []);
+
   // 수동 저장
   const saveNow = useCallback(async () => {
     if (!hydrated) return;
@@ -889,5 +916,6 @@ export function useGarden() {
     addLocalTool,
     updateLocalTool,
     deleteLocalTool,
+    setPledge,
   };
 }
