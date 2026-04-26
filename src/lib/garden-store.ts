@@ -530,13 +530,23 @@ export function useGarden() {
       const multiplier = !wasCompleted ? (combo >= 10 ? 2 : combo >= 5 ? 1.5 : 1) : 1;
       const reward = Math.round(baseReward * multiplier);
 
+      // 개별 할일 XP 캡: 레벨업은 일일 전체 완료 또는 프로젝트 완료 시에만 허용
+      // 할일 XP가 레벨 경계를 넘지 않도록 제한
+      const { currentXp, nextXp } = levelFromXp(s.totalXp);
+      let xpDelta: number;
+      if (!wasCompleted) {
+        const headroom = Math.max(0, nextXp - currentXp - 1);
+        xpDelta = Math.min(reward, headroom);
+      } else {
+        xpDelta = -reward;
+      }
+
       const tasks = s.tasks.map((t) =>
         t.id === id
           ? { ...t, completed: !t.completed, completedAt: !t.completed ? now : undefined }
           : t,
       );
 
-      let xpDelta = wasCompleted ? -reward : reward;
       let newTotal = Math.max(0, s.totalXp + xpDelta);
       let newXp = Math.max(0, s.xp + xpDelta);
 
@@ -544,18 +554,20 @@ export function useGarden() {
       let streak = s.streak;
       if (!wasCompleted && !completedTodayBefore) streak = s.streak + 1;
 
-      // 일일 보너스: 오늘 모든 일반 할일(프로젝트 외)이 완료되면 부여
+      // 일일 보너스: 오늘 할일을 전부 완료하면 즉시 레벨업 보장
       let dailyBonusGivenOn = s.dailyBonusGivenOn;
       const todaysTasks = tasks.filter((t) => t.date === today);
       const allDone = todaysTasks.length > 0 && todaysTasks.every((t) => t.completed);
       let bonusDelta = 0;
       if (!wasCompleted && allDone && dailyBonusGivenOn !== today) {
-        bonusDelta = DAILY_CLEAR_BONUS;
+        // 현재 레벨에서 남은 XP를 전부 채워 즉시 레벨업
+        const { currentXp: cxp, nextXp: nxp } = levelFromXp(newTotal);
+        bonusDelta = Math.max(nxp - cxp, DAILY_CLEAR_BONUS);
         dailyBonusGivenOn = today;
         newXp += bonusDelta;
         newTotal += bonusDelta;
       }
-      // 보너스를 회수해야 하는 경우 (완료 해제로 더 이상 all done이 아닌데 오늘 보너스 받았던 경우)
+      // 보너스 회수: 완료 해제로 allDone이 아닌데 오늘 보너스를 이미 받은 경우
       if (wasCompleted && dailyBonusGivenOn === today && !allDone) {
         bonusDelta = -DAILY_CLEAR_BONUS;
         dailyBonusGivenOn = undefined;
@@ -663,7 +675,7 @@ export function useGarden() {
   }, []);
 
   // ====== Projects ======
-  const addProject = useCallback((title: string, description?: string, dueDate?: string) => {
+  const addProject = useCallback((title: string, description?: string, dueDate?: string, farmId?: string | null) => {
     setState((s) => ({
       ...s,
       projects: [
@@ -676,6 +688,7 @@ export function useGarden() {
           completed: false,
           createdAt: Date.now(),
           order: s.projects.length,
+          farmId: farmId ?? null,
         },
       ],
     }));

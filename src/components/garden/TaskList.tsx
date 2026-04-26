@@ -176,6 +176,9 @@ export function TaskList({ tasks, onToggle, onDelete, onPostpone, onAdd, onReord
   };
 
   const mustCount = sorted.filter((t) => t.kind === "must" && !t.completed).length;
+  const totalCount = sorted.length;
+  const doneCount = sorted.filter((t) => t.completed).length;
+  const allDone = totalCount > 0 && doneCount === totalCount;
 
   return (
     <section className="space-y-5">
@@ -185,11 +188,23 @@ export function TaskList({ tasks, onToggle, onDelete, onPostpone, onAdd, onReord
           오늘의 임무
           <span className="text-muted-foreground font-normal">{tasks.length}</span>
         </h2>
-        {mustCount > 0 && (
-          <span className="text-xs px-2 py-1 rounded-full bg-destructive/15 text-destructive border border-destructive/30 font-semibold">
-            ⚠ 필수 {mustCount}개 남음
-          </span>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {allDone && (
+            <span className="text-xs px-2 py-1 rounded-full bg-primary/20 text-primary border border-primary/40 font-semibold animate-pulse">
+              🏆 레벨업 달성!
+            </span>
+          )}
+          {!allDone && totalCount > 0 && (
+            <span className="text-xs px-2 py-1 rounded-full bg-card border border-white/10 text-muted-foreground">
+              전부 완료하면 레벨업 🏆 ({doneCount}/{totalCount})
+            </span>
+          )}
+          {mustCount > 0 && (
+            <span className="text-xs px-2 py-1 rounded-full bg-destructive/15 text-destructive border border-destructive/30 font-semibold">
+              ⚠ 필수 {mustCount}개 미완료 시 벌점
+            </span>
+          )}
+        </div>
       </div>
 
       <form

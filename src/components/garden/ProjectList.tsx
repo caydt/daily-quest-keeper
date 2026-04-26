@@ -34,7 +34,7 @@ type Props = {
   tasks: Task[];
   totalXp: number;
   availableTools: Tool[];
-  onAdd: (title: string, description?: string, dueDate?: string) => void;
+  onAdd: (title: string, description?: string, dueDate?: string, farmId?: string | null) => void;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onReorder: (orderedIds: string[]) => void;
@@ -174,9 +174,9 @@ function ProjectCard({
               <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{p.description}</p>
             )}
             {!p.completed && (
-              <div className="text-[11px] text-primary/90 mt-1.5 font-semibold flex items-center gap-1">
+              <div className="text-[11px] text-primary/60 mt-1.5 flex items-center gap-1">
                 <Sparkles className="size-3" />
-                완료 시 +{rewardXp} XP · 즉시 레벨업 🎉
+                나무 완료 시 즉시 레벨업 🏆
               </div>
             )}
 
@@ -678,13 +678,7 @@ export function ProjectList({
   const submitProject = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onAdd(title.trim(), description.trim() || undefined, dueDate || undefined);
-    // 특정 농장에 추가하는 경우 이동
-    if (addingToFarmId) {
-      // onAdd가 새 프로젝트를 만들면 그 ID를 알 수 없어서,
-      // 마지막으로 추가된 프로젝트를 농장으로 이동하는 건 store에서 처리해야 함
-      // 여기서는 일단 독립 나무로 추가 후 사용자가 이동하도록 안내
-    }
+    onAdd(title.trim(), description.trim() || undefined, dueDate || undefined, addingToFarmId);
     setTitle(""); setDescription(""); setDueDate("");
     setShowAddProject(false); setAddingToFarmId(null);
   };
@@ -706,8 +700,7 @@ export function ProjectList({
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
               <Sparkles className="size-3 text-primary" />
-              완료 시 <span className="text-primary font-bold">Lv.{level + 1}</span>
-              <span className="text-muted-foreground/70">(+{rewardXp} XP)</span>
+              나무 완료 → <span className="text-primary font-bold">Lv.{level + 1}</span> 즉시 레벨업
             </p>
           </div>
         </div>
