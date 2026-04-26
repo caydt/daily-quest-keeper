@@ -1,9 +1,14 @@
 import { useState } from "react";
-import type { ConditionMode } from "@/lib/garden-store";
+import type { ConditionMode, Settings, Task } from "@/lib/garden-store";
 import { CONDITION_META } from "@/lib/garden-store";
+import { getRandomFutureSelfMessage } from "@/lib/condition-messages";
+import { sendMessage, toAiSettings } from "@/lib/ai-adapter";
+import { buildConditionContext } from "@/lib/ai-context";
 
 type Props = {
   onSelect: (mode: ConditionMode) => void;
+  settings: Settings;
+  pendingTasks: Task[];
 };
 
 const CONDITIONS: ConditionMode[] = ["best", "normal", "low", "sick"];
@@ -44,13 +49,46 @@ function getRandomCheer(mode: ConditionMode): string {
   return list[Math.floor(Math.random() * list.length)];
 }
 
-export function ConditionSelector({ onSelect }: Props) {
+export function ConditionSelector({ onSelect, settings, pendingTasks }: Props) {
   const [cheer, setCheer] = useState<{ mode: ConditionMode; msg: string } | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  const handleSelect = (mode: ConditionMode) => {
-    const msg = getRandomCheer(mode);
-    setCheer({ mode, msg });
-    // 1.5초 후 실제 선택 완료
+  const handleSelect = async (mode: ConditionMode) => {
+    // 먼저 정적 메시지로 즉시 표시
+    const staticMsg = getRandomFutureSelfMessage(mode);
+    setCheer({ mode, msg: staticMsg });
+    setIsGenerating(false);
+
+    // AI 활성화 && API 키 있으면 AI 메시지로 교체 시도
+    const aiSettings = toAiSettings(settings);
+    const useAi =
+      (settings.aiConditionMessageEnabled ?? true) &&
+      aiSettings &&
+      aiSettings.provider !== "claude";
+
+    if (useAi && aiSettings) {
+      setIsGenerating(true);
+      try {
+        const context = buildConditionContext(mode, pendingTasks);
+        const systemPrompt =
+          "당신은 사용자의 10년 뒤 미래 자아입니다. 지금의 나를 돌아보며 따뜻하고 담담하게 한 마디 해주세요. 2-3문장, 한국어로만 답하세요. 격식 없이 편하게.";
+        let aiMsg = "";
+        const gen = sendMessage(
+          [{ role: "user", content: `${systemPrompt}\n\n${context}` }],
+          aiSettings,
+        );
+        for await (const chunk of gen) {
+          aiMsg += chunk;
+          setCheer({ mode, msg: aiMsg });
+        }
+      } catch {
+        // AI 실패 시 정적 메시지 유지
+      } finally {
+        setIsGenerating(false);
+      }
+    }
+
+    // 1.5초 후 선택 완료
     setTimeout(() => onSelect(mode), 1500);
   };
 
@@ -69,6 +107,9 @@ export function ConditionSelector({ onSelect }: Props) {
             <p className="text-base text-foreground leading-relaxed px-2">
               {cheer.msg}
             </p>
+            {isGenerating && (
+              <p className="text-[11px] text-muted-foreground animate-pulse">✨ 미래의 내가 말을 고르는 중...</p>
+            )}
           </div>
         ) : (
           <>
@@ -86,7 +127,7 @@ export function ConditionSelector({ onSelect }: Props) {
                 return (
                   <button
                     key={mode}
-                    onClick={() => handleSelect(mode)}
+                    onClick={() => void handleSelect(mode)}
                     className="group flex flex-col items-center gap-2 p-5 rounded-2xl border border-white/10 bg-card hover:border-primary/50 hover:bg-card/80 active:scale-95 transition-all duration-150"
                   >
                     <span className="text-4xl group-hover:scale-110 transition-transform duration-150">
