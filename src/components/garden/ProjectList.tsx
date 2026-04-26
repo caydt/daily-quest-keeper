@@ -77,6 +77,7 @@ function ProjectCard({
   onMoveToFarm,
   onToggleProjectTool,
   onUpdateProject,
+  onAddSubTask,
   settings,
   onAddTasksToProject,
 }: {
@@ -456,6 +457,7 @@ function FarmCard({
   onUnassign,
   onMoveProjectToFarm,
   onAddTree,
+  onAddSubTask,
   onToggleProjectTool,
   onUpdateProject,
   settings,
