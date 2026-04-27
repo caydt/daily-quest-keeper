@@ -3,9 +3,12 @@ import type { StorageAdapter } from "@/lib/storage";
 
 export const SCRIPT_URL_KEY = "lumi-script-url";
 
+const DEFAULT_SCRIPT_URL =
+  "https://script.google.com/macros/s/AKfycby-kcKgg-nrnp_X64J-fWlGcTv8hyv0DRxWY284lFq6cxRVdx2v7iEAE8h-lFlN5Bq6-A/exec";
+
 export function getScriptUrl(): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem(SCRIPT_URL_KEY) ?? "";
+  if (typeof window === "undefined") return DEFAULT_SCRIPT_URL;
+  return localStorage.getItem(SCRIPT_URL_KEY) || DEFAULT_SCRIPT_URL;
 }
 
 export function setScriptUrl(url: string) {
