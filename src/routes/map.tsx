@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import type { Farm, Project } from "@/lib/garden-store";
 import { useGarden, treeStage, farmStage } from "@/lib/garden-store";
 import { ArrowLeft } from "lucide-react";
 
@@ -8,6 +9,13 @@ export const Route = createFileRoute("/map")({
   }),
   component: MapPage,
 });
+
+type TreeData = {
+  tree: Project;
+  pct: number;
+  done: number;
+  total: number;
+};
 
 function MapPage() {
   const { state, hydrated } = useGarden();
@@ -64,16 +72,19 @@ function MapPage() {
               .filter((p) => p.farmId === farm.id)
               .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-            const treeStats = trees.map((p) => {
-              const childTasks = state.tasks.filter((t) => t.projectId === p.id);
+            // 나무별 진행률을 한 번만 계산 (FarmTerritory + TreeNode 이중 순회 방지)
+            const treeData: TreeData[] = trees.map((tree) => {
+              const childTasks = state.tasks.filter((t) => t.projectId === tree.id);
               const total = childTasks.length;
               const done = childTasks.filter((t) => t.completed).length;
-              return total === 0 ? (p.completed ? 100 : 0) : (done / total) * 100;
+              const pct = total === 0 ? (tree.completed ? 100 : 0) : (done / total) * 100;
+              return { tree, pct, done, total };
             });
+
             const avgPct =
-              treeStats.length === 0
+              treeData.length === 0
                 ? 0
-                : treeStats.reduce((a, b) => a + b, 0) / treeStats.length;
+                : treeData.reduce((s, d) => s + d.pct, 0) / treeData.length;
             const stage = farmStage(trees.length, avgPct);
 
             // 홀짝 행마다 살짝 offset으로 RPG 지도 느낌
@@ -81,13 +92,7 @@ function MapPage() {
 
             return (
               <div key={farm.id} className={offset}>
-                <FarmTerritory
-                  farm={farm}
-                  trees={trees}
-                  tasks={state.tasks}
-                  stage={stage}
-                  avgPct={avgPct}
-                />
+                <FarmTerritory farm={farm} treeData={treeData} stage={stage} avgPct={avgPct} />
               </div>
             );
           })}
@@ -99,21 +104,23 @@ function MapPage() {
 
 function FarmTerritory({
   farm,
-  trees,
-  tasks,
+  treeData,
   stage,
   avgPct,
 }: {
-  farm: import("@/lib/garden-store").Farm;
-  trees: import("@/lib/garden-store").Project[];
-  tasks: import("@/lib/garden-store").Task[];
+  farm: Farm;
+  treeData: TreeData[];
   stage: { icon: string; label: string };
   avgPct: number;
 }) {
   return (
-    <a
-      href={`/?scroll=farm-${farm.id}`}
-      className="block rounded-3xl border-2 border-emerald-500/30 bg-emerald-950/25 hover:border-emerald-400/50 hover:bg-emerald-950/40 transition-all group"
+    // <a> 중첩 방지: 외부 컨테이너는 div, 내부 TreeNode만 <a> 사용
+    <div
+      onClick={() => { window.location.href = `/?scroll=farm-${farm.id}`; }}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") window.location.href = `/?scroll=farm-${farm.id}`; }}
+      role="link"
+      tabIndex={0}
+      className="block rounded-3xl border-2 border-emerald-500/30 bg-emerald-950/25 hover:border-emerald-400/50 hover:bg-emerald-950/40 transition-all group cursor-pointer"
     >
       {/* 농장 헤더 */}
       <div className="px-5 pt-5 pb-3 flex items-center gap-3">
@@ -126,7 +133,7 @@ function FarmTerritory({
             </span>
           </div>
           <p className="text-[11px] text-muted-foreground mt-0.5">
-            나무 {trees.length}그루 · 평균 {Math.round(avgPct)}%
+            나무 {treeData.length}그루 · 평균 {Math.round(avgPct)}%
           </p>
         </div>
         {farm.icon && (
@@ -148,34 +155,33 @@ function FarmTerritory({
 
       {/* 나무 노드들 */}
       <div className="px-5 pb-5">
-        {trees.length === 0 ? (
+        {treeData.length === 0 ? (
           <p className="text-xs text-muted-foreground/50 italic text-center py-4">
             아직 나무가 없어요
           </p>
         ) : (
           <div className="flex flex-wrap gap-3">
-            {trees.map((tree) => (
-              <TreeNode key={tree.id} tree={tree} tasks={tasks} farmId={farm.id} />
+            {treeData.map(({ tree, pct, done, total }) => (
+              <TreeNode key={tree.id} tree={tree} pct={pct} done={done} total={total} />
             ))}
           </div>
         )}
       </div>
-    </a>
+    </div>
   );
 }
 
 function TreeNode({
   tree,
-  tasks,
+  pct,
+  done,
+  total,
 }: {
-  tree: import("@/lib/garden-store").Project;
-  tasks: import("@/lib/garden-store").Task[];
-  farmId: string;
+  tree: Project;
+  pct: number;
+  done: number;
+  total: number;
 }) {
-  const childTasks = tasks.filter((t) => t.projectId === tree.id);
-  const total = childTasks.length;
-  const done = childTasks.filter((t) => t.completed).length;
-  const pct = total === 0 ? (tree.completed ? 100 : 0) : (done / total) * 100;
   const stage = treeStage(pct, tree.completed);
 
   return (
@@ -189,7 +195,7 @@ function TreeNode({
     >
       {/* 원형 아이콘 */}
       <div
-        className={`size-14 rounded-full flex items-center justify-center text-2xl border-2 transition-all ${
+        className={`size-16 rounded-full flex items-center justify-center text-2xl border-2 transition-all ${
           tree.completed
             ? "border-primary/30 bg-primary/10"
             : "border-accent/30 bg-card/60 group-hover/tree:border-accent/70 group-hover/tree:bg-accent/10"
