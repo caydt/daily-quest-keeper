@@ -122,6 +122,7 @@ function ProjectCard({
 
   return (
     <div
+      id={`project-${p.id}`}
       ref={setNodeRef}
       style={style}
       className={`group relative rounded-2xl border-2 transition-all ${
@@ -514,7 +515,7 @@ function FarmCard({
   const stage = farmStage(trees.length, avgPct);
 
   return (
-    <div className="rounded-3xl border border-emerald-500/20 bg-emerald-950/20 overflow-hidden">
+    <div id={`farm-${farm.id}`} className="rounded-3xl border border-emerald-500/20 bg-emerald-950/20 overflow-hidden">
       {/* 농장 헤더 */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-emerald-500/10">
         <button
