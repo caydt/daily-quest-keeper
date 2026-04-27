@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useGarden, todayStr, filterTasksByCondition, CONDITION_META } from "@/lib/garden-store";
 import { useToolsSheet } from "@/lib/tools-sheet";
 import type { ConditionMode } from "@/lib/garden-store";
@@ -13,7 +13,7 @@ import { SidePanels } from "@/components/garden/SidePanels";
 import { ConditionSelector } from "@/components/garden/ConditionSelector";
 import { AiSidePanel } from "@/components/AiSidePanel";
 import { PledgeBoard } from "@/components/PledgeBoard";
-import { Settings as SettingsIcon, BarChart3, Bell, BellOff, Wrench, Sparkles } from "lucide-react";
+import { Settings as SettingsIcon, BarChart3, Bell, BellOff, Wrench, Sparkles, Map } from "lucide-react";
 import {
   DndContext,
   PointerSensor,
@@ -88,6 +88,32 @@ function Index() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   useReminders(state.tasks, state.settings, state.notificationsEnabled && hydrated);
+
+  // ?scroll=farm-xxx 또는 ?scroll=project-xxx 파라미터 처리
+  useEffect(() => {
+    if (!hydrated) return;
+    const params = new URLSearchParams(window.location.search);
+    const scrollTo = params.get("scroll");
+    if (!scrollTo) return;
+    // DOM 렌더 후 실행
+    const timer = setTimeout(() => {
+      const el = document.getElementById(scrollTo);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.style.transition = "outline 0.1s";
+      el.style.outline = "2px solid hsl(var(--primary))";
+      el.style.outlineOffset = "4px";
+      setTimeout(() => {
+        el.style.outline = "";
+        el.style.outlineOffset = "";
+      }, 2000);
+      // URL에서 파라미터 제거 (뒤로가기 시 재실행 방지)
+      const url = new URL(window.location.href);
+      url.searchParams.delete("scroll");
+      window.history.replaceState({}, "", url.toString());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [hydrated]);
 
   const handleToggleNotifications = async () => {
     if (state.notificationsEnabled) {
@@ -218,6 +244,12 @@ function Index() {
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 bg-card/60 hover:border-primary/40 text-xs font-medium text-muted-foreground hover:text-primary transition"
             >
               <BarChart3 className="size-3.5" /> <span className="hidden sm:inline">주간 회고</span>
+            </Link>
+            <Link
+              to="/map"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 bg-card/60 hover:border-primary/40 text-xs font-medium text-muted-foreground hover:text-primary transition"
+            >
+              <Map className="size-3.5" /> <span className="hidden sm:inline">맵</span>
             </Link>
             {(state.settings.aiChatEnabled ?? true) && (
               <button
