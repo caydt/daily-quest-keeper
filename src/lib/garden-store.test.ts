@@ -191,4 +191,16 @@ describe("hydrate/save race", () => {
 
     await waitFor(() => expect(result.current.syncReady).toBe(true));
   });
+
+  it("syncReady=false 동안 saveNow() 호출해도 POST 발생 안 함", async () => {
+    const { result } = renderHook(() => useGarden());
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    // GET resolve 안 함 → syncReady=false 유지
+
+    await act(async () => {
+      await result.current.saveNow();
+    });
+
+    expect(fetchCtrl.postCalls).toHaveLength(0);
+  });
 });

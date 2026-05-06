@@ -936,6 +936,7 @@ export function useGarden() {
   // 수동 저장
   const saveNow = useCallback(async () => {
     if (!hydrated) return;
+    if (!syncReady) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
 
     const scriptUrl = getScriptUrl();
@@ -953,7 +954,7 @@ export function useGarden() {
       if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
       savedResetTimer.current = setTimeout(() => setSaveStatus("idle"), 3000);
     }
-  }, [state, hydrated]);
+  }, [state, hydrated, syncReady]);
 
   // 오늘 컨디션이 설정됐는지 여부 (날짜 기준 자동 초기화)
   const todayCondition: ConditionMode | null =
