@@ -147,4 +147,48 @@ describe("hydrate/save race", () => {
     // 원격 fetch 도착 전엔 POST 발생하지 않아야 함
     expect(fetchCtrl.postCalls).toHaveLength(0);
   });
+
+  it("원격 데이터 도착 시 state가 원격으로 갱신되고 syncReady=true", async () => {
+    const { result } = renderHook(() => useGarden());
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    // 원격 데이터 응답
+    await act(async () => {
+      fetchCtrl.resolveGet({
+        farms: [farm("remote-a", 0, "원격 농장")],
+        projects: [],
+        tasks: [],
+      });
+      await new Promise((r) => setTimeout(r, 0)); // 마이크로태스크 한 번
+    });
+
+    await waitFor(() => expect(result.current.syncReady).toBe(true));
+    expect(result.current.state.farms).toHaveLength(1);
+    expect(result.current.state.farms[0].id).toBe("remote-a");
+  });
+
+  it("원격 fetch 실패 시에도 syncReady=true가 된다", async () => {
+    const { result } = renderHook(() => useGarden());
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    await act(async () => {
+      fetchCtrl.rejectGet(new Error("network down"));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    await waitFor(() => expect(result.current.syncReady).toBe(true));
+  });
+
+  it("원격 응답이 빈 객체일 때도 syncReady=true가 된다", async () => {
+    // 로컬에 데이터를 넣어두지 않으면 빈 응답일 때 save(local)이 호출되지 않음
+    const { result } = renderHook(() => useGarden());
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    await act(async () => {
+      fetchCtrl.resolveGet({});
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    await waitFor(() => expect(result.current.syncReady).toBe(true));
+  });
 });
