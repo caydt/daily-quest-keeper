@@ -33,4 +33,48 @@ describe("moveFarm", () => {
     const byId = Object.fromEntries(result.current.state.farms.map((f) => [f.id, f.order]));
     expect(byId).toEqual({ a: 1, b: 0, c: 2 });
   });
+
+  it("중간 농장 ▼ 클릭: 아래 농장과 order swap", async () => {
+    const result = await seedAndHydrate([farm("a", 0), farm("b", 1), farm("c", 2)]);
+
+    act(() => {
+      result.current.moveFarm("b", "down");
+    });
+
+    const byId = Object.fromEntries(result.current.state.farms.map((f) => [f.id, f.order]));
+    expect(byId).toEqual({ a: 0, b: 2, c: 1 });
+  });
+
+  it("첫 농장 ▲ 클릭: no-op", async () => {
+    const result = await seedAndHydrate([farm("a", 0), farm("b", 1)]);
+
+    act(() => {
+      result.current.moveFarm("a", "up");
+    });
+
+    const byId = Object.fromEntries(result.current.state.farms.map((f) => [f.id, f.order]));
+    expect(byId).toEqual({ a: 0, b: 1 });
+  });
+
+  it("마지막 농장 ▼ 클릭: no-op", async () => {
+    const result = await seedAndHydrate([farm("a", 0), farm("b", 1)]);
+
+    act(() => {
+      result.current.moveFarm("b", "down");
+    });
+
+    const byId = Object.fromEntries(result.current.state.farms.map((f) => [f.id, f.order]));
+    expect(byId).toEqual({ a: 0, b: 1 });
+  });
+
+  it("존재하지 않는 id: no-op", async () => {
+    const result = await seedAndHydrate([farm("a", 0), farm("b", 1)]);
+
+    act(() => {
+      result.current.moveFarm("ghost", "up");
+    });
+
+    const byId = Object.fromEntries(result.current.state.farms.map((f) => [f.id, f.order]));
+    expect(byId).toEqual({ a: 0, b: 1 });
+  });
 });
