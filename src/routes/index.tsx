@@ -65,6 +65,7 @@ function Index() {
     addFarm,
     deleteFarm,
     updateFarm,
+    moveFarm,
     moveProjectToFarm,
     toggleFarmTool,
     toggleProjectTool,
@@ -310,6 +311,7 @@ function Index() {
                 onAddSubTask={addSubTask}
                 settings={state.settings}
                 onAddTasksToProject={handleAddTasksToProject}
+                onMoveFarm={moveFarm}
               />
               <TaskList
                 tasks={visibleStandalone}
