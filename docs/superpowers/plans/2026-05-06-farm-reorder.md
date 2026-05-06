@@ -10,6 +10,12 @@
 
 **Spec:** `docs/superpowers/specs/2026-05-06-farm-reorder-design.md`
 
+**Baseline notes (작업 시작 전 상태):**
+- `npm run build` 통과
+- `npm run lint` — 261개 prettier 포매팅 경고/에러 (기존 코드의 baseline 상태). **새로 만지는 파일에 새 lint 오류만 만들지 않으면 OK**. 기존 오류 일괄 수정은 본 작업 범위 아님.
+- 테스트 인프라 미존재 (Task 1에서 도입)
+- 패키지 매니저: `npm` (시스템 PATH에 `bun` 없음)
+
 ---
 
 ## File Structure
@@ -39,11 +45,10 @@
 - [ ] **Step 1: devDependencies 설치**
 
 ```bash
-cd /Users/ayoungjo/daily-quest-keeper
-bun add -d vitest @testing-library/react @testing-library/jest-dom @testing-library/user-event jsdom @vitest/ui
+npm install -D vitest @testing-library/react @testing-library/jest-dom @testing-library/user-event jsdom @vitest/ui
 ```
 
-(이 프로젝트는 `bun.lockb`가 있으므로 bun 사용. `npm install` 도 가능하지만 lockfile이 갈라질 수 있음.)
+(`package-lock.json`을 사용. `bun.lockb`도 있지만 시스템 PATH에 bun이 없어 npm으로 통일.)
 
 - [ ] **Step 2: `package.json` scripts에 test 추가**
 
@@ -100,7 +105,7 @@ describe("test infra sanity", () => {
 - [ ] **Step 6: 테스트 러너 동작 확인**
 
 ```bash
-bun run test:run
+npm run test:run
 ```
 
 기대 결과: sanity 테스트 1개 PASS. jsdom 환경, jest-dom 매처가 로드된 상태로 종료 코드 0.
@@ -110,7 +115,7 @@ bun run test:run
 - [ ] **Step 7: 커밋**
 
 ```bash
-git add package.json bun.lockb vite.config.ts src/test-setup.ts src/lib/sanity.test.ts
+git add package.json package-lock.json vite.config.ts src/test-setup.ts src/lib/sanity.test.ts
 git commit -m "chore(test): vitest + testing-library 인프라 도입"
 ```
 
@@ -175,7 +180,7 @@ describe("moveFarm", () => {
 - [ ] **Step 3: 테스트 실행 — RED 확인**
 
 ```bash
-bun run test:run src/lib/garden-store.test.ts
+npm run test:run src/lib/garden-store.test.ts
 ```
 
 기대: `result.current.moveFarm is not a function` 으로 FAIL.
@@ -229,7 +234,7 @@ return {
 - [ ] **Step 5: 테스트 실행 — GREEN 확인**
 
 ```bash
-bun run test:run src/lib/garden-store.test.ts
+npm run test:run src/lib/garden-store.test.ts
 ```
 
 기대: 1 passed.
@@ -308,7 +313,7 @@ it("존재하지 않는 id: no-op", async () => {
 - [ ] **Step 2: 테스트 실행**
 
 ```bash
-bun run test:run src/lib/garden-store.test.ts
+npm run test:run src/lib/garden-store.test.ts
 ```
 
 기대: 5 passed (Task 2의 1개 + 추가 4개). Task 2 구현이 이미 경계/미존재를 처리하므로 GREEN 바로 통과해야 함. 만약 실패하면 구현 로직(`if (idx === -1) return s; if (swapIdx < 0 || swapIdx >= sorted.length) return s;`) 점검.
@@ -344,8 +349,8 @@ export function FarmCard({
 - [ ] **Step 2: lint + 빌드 점검**
 
 ```bash
-bun run lint
-bun run build
+npm run lint
+npm run build
 ```
 
 기대: 둘 다 성공. `FarmCard` export가 다른 곳에서 안 쓰이므로 unused 경고 없음. (`ProjectList.tsx` 내부에서 이미 사용.)
@@ -446,7 +451,7 @@ describe("FarmCard 순서 변경 버튼", () => {
 - [ ] **Step 2: 테스트 실행 — RED 확인**
 
 ```bash
-bun run test:run src/components/garden/FarmCard.test.tsx
+npm run test:run src/components/garden/FarmCard.test.tsx
 ```
 
 기대: TS 에러 (`Property 'isFirst' does not exist...`) 또는 런타임 — `getByRole`이 버튼을 찾지 못해 FAIL.
@@ -532,7 +537,7 @@ import { ChevronDown, ChevronRight, ChevronUp, /* 기존... */ } from "lucide-re
 - [ ] **Step 5: 테스트 실행 — GREEN 확인**
 
 ```bash
-bun run test:run src/components/garden/FarmCard.test.tsx
+npm run test:run src/components/garden/FarmCard.test.tsx
 ```
 
 기대: 2 passed.
@@ -620,7 +625,7 @@ it("isLast=true 상태에서 ▼ 클릭 — 핸들러 호출되지 않음", asyn
 - [ ] **Step 2: 테스트 실행**
 
 ```bash
-bun run test:run src/components/garden/FarmCard.test.tsx
+npm run test:run src/components/garden/FarmCard.test.tsx
 ```
 
 기대: 6 passed (Task 5의 2개 + 추가 4개).
@@ -698,8 +703,8 @@ export function ProjectList({
 - [ ] **Step 4: lint + typecheck**
 
 ```bash
-bun run lint
-bun run build
+npm run lint
+npm run build
 ```
 
 기대: 둘 다 성공. `Props` 타입에 `onMoveFarm`을 추가했으므로 호출 측(`index.tsx`)이 prop을 빠뜨리면 다음 Task에서 typecheck 에러로 잡힘 — 정상.
@@ -757,8 +762,8 @@ const {
 - [ ] **Step 3: 빌드 + 전체 테스트**
 
 ```bash
-bun run build
-bun run test:run
+npm run build
+npm run test:run
 ```
 
 기대: 빌드 성공, 전체 테스트(store 5 + FarmCard 6 = 11) 모두 PASS.
@@ -780,7 +785,7 @@ git commit -m "feat(garden): index.tsx에서 moveFarm을 ProjectList로 전달"
 
 ```bash
 cd /Users/ayoungjo/daily-quest-keeper
-bun run dev
+npm run dev
 ```
 
 브라우저에서 출력된 URL 열기 (보통 `http://localhost:5173`).
