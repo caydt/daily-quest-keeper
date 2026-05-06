@@ -948,6 +948,7 @@ export function ProjectList({
           onAddTasksToProject={onAddTasksToProject}
           isFirst={idx === 0}
           isLast={idx === sortedFarms.length - 1}
+          // TODO(Task 7): onMoveFarm로 교체. 임시 stub.
           onMoveUp={() => {}}
           onMoveDown={() => {}}
         />
