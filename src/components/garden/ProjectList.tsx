@@ -50,6 +50,7 @@ type Props = {
   onAddSubTask: (projectId: string, title: string) => void;
   settings: Settings;
   onAddTasksToProject: (projectId: string | null, titles: string[]) => void;
+  onMoveFarm: (id: string, direction: "up" | "down") => void;
 };
 
 // ── 나무 성장 단계 컴포넌트
@@ -779,6 +780,7 @@ export function ProjectList({
   settings,
   onAddTasksToProject,
   onAddSubTask,
+  onMoveFarm,
 }: Props) {
   const [showAddProject, setShowAddProject] = useState(false);
   const [addingToFarmId, setAddingToFarmId] = useState<string | null>(null);
@@ -948,9 +950,8 @@ export function ProjectList({
           onAddTasksToProject={onAddTasksToProject}
           isFirst={idx === 0}
           isLast={idx === sortedFarms.length - 1}
-          // TODO(Task 7): onMoveFarm로 교체. 임시 stub.
-          onMoveUp={() => {}}
-          onMoveDown={() => {}}
+          onMoveUp={(id) => onMoveFarm(id, "up")}
+          onMoveDown={(id) => onMoveFarm(id, "down")}
         />
       ))}
 
