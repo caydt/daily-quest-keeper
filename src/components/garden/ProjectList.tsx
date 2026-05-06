@@ -453,7 +453,8 @@ function ProjectCard({
 }
 
 // ── 농장 카드 (나무들을 담는 컨테이너)
-function FarmCard({
+// 테스트 노출용 export — 외부 사용 금지, 다른 모듈에서 import하지 말 것
+export function FarmCard({
   farm,
   trees,
   tasks,
