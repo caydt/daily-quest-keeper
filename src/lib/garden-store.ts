@@ -262,6 +262,7 @@ export type SaveStatus = "idle" | "saving" | "saved" | "error";
 export function useGarden() {
   const [state, setState] = useState<GardenState>(initial);
   const [hydrated, setHydrated] = useState(false);
+  const [syncReady, setSyncReady] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const isApplyingRemote = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -298,7 +299,10 @@ export function useGarden() {
 
       // ② Apps Script URL 있으면 백그라운드에서 원격 데이터 가져와 갱신
       const scriptUrl = getScriptUrl();
-      if (!scriptUrl) return;
+      if (!scriptUrl) {
+        if (!cancelled) setSyncReady(true);
+        return;
+      }
 
       try {
         const remote = await createSheetsAdapter(scriptUrl).load();
@@ -314,6 +318,8 @@ export function useGarden() {
         applyState(mergeState(remote));
       } catch {
         // Apps Script 실패 → 이미 로컬 데이터가 표시된 상태이므로 그대로 유지
+      } finally {
+        if (!cancelled) setSyncReady(true);
       }
     };
 
@@ -324,6 +330,7 @@ export function useGarden() {
   // 저장: StorageAdapter 기반 debounce 저장
   useEffect(() => {
     if (!hydrated) return;
+    if (!syncReady) return;
     if (isApplyingRemote.current) return;
 
     const scriptUrl = getScriptUrl();
@@ -348,7 +355,7 @@ export function useGarden() {
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [state, hydrated]);
+  }, [state, hydrated, syncReady]);
 
   // 윈도우 포커스 시 원격 데이터 리패치
   useEffect(() => {
@@ -955,6 +962,7 @@ export function useGarden() {
   return {
     state,
     hydrated,
+    syncReady,
     saveStatus,
     saveNow,
     todayCondition,
