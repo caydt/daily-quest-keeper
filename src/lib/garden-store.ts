@@ -267,62 +267,53 @@ export function useGarden() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 로드: StorageAdapter 기반
+  // 로드: 로컬 먼저 즉시 렌더 → Apps Script 백그라운드 갱신
   useEffect(() => {
     let cancelled = false;
 
+    const mergeState = (data: Partial<GardenState>): GardenState => ({
+      ...initial,
+      ...data,
+      settings: { ...initial.settings, ...(data.settings || {}) },
+      history: (data as GardenState).history || [],
+      projects: (data as GardenState).projects || [],
+      farms: (data as GardenState).farms || [],
+      achievements: (data as GardenState).achievements || {},
+      localTools: (data as GardenState).localTools || [],
+      pledges: (data as GardenState).pledges || [],
+    });
+
+    const applyState = (next: GardenState) => {
+      isApplyingRemote.current = true;
+      setState(next);
+      requestAnimationFrame(() => { isApplyingRemote.current = false; });
+    };
+
     const run = async () => {
-      setHydrated(false);
+      // ① 로컬 데이터 즉시 로드 → 빈 화면 없이 바로 렌더
+      const local = await createLocalAdapter().load();
+      if (cancelled) return;
+      applyState(local ? mergeState(local) : initial);
+      setHydrated(true);
+
+      // ② Apps Script URL 있으면 백그라운드에서 원격 데이터 가져와 갱신
       const scriptUrl = getScriptUrl();
-      const adapter = scriptUrl ? createSheetsAdapter(scriptUrl) : createLocalAdapter();
+      if (!scriptUrl) return;
 
       try {
-        const remote = await adapter.load();
+        const remote = await createSheetsAdapter(scriptUrl).load();
         if (cancelled) return;
 
-        let next: GardenState;
         if (!remote || Object.keys(remote).length === 0) {
-          const local = await createLocalAdapter().load();
-          next = local ? { ...initial, ...local, settings: { ...initial.settings, ...(local.settings || {}) }, history: local.history || [], projects: local.projects || [], farms: local.farms || [], achievements: local.achievements || {}, localTools: local.localTools || [], pledges: local.pledges || [] } : initial;
-          if (scriptUrl && next !== initial) {
-            await createSheetsAdapter(scriptUrl).save(next).catch(() => {});
-          }
-        } else {
-          next = {
-            ...initial,
-            ...remote,
-            settings: { ...initial.settings, ...(remote.settings || {}) },
-            history: remote.history || [],
-            projects: remote.projects || [],
-            farms: remote.farms || [],
-            achievements: remote.achievements || {},
-            localTools: remote.localTools || [],
-            pledges: remote.pledges || [],
-          };
+          // 시트가 비어있으면 로컬 데이터를 업로드해 초기화
+          if (local) await createSheetsAdapter(scriptUrl).save(local).catch(() => {});
+          return;
         }
 
-        if (cancelled) return;
-        isApplyingRemote.current = true;
-        setState(next);
-        setHydrated(true);
-        requestAnimationFrame(() => { isApplyingRemote.current = false; });
+        // 원격 데이터가 있으면 갱신 (로컬보다 우선)
+        applyState(mergeState(remote));
       } catch {
-        const local = await createLocalAdapter().load();
-        if (cancelled) return;
-        isApplyingRemote.current = true;
-        setState(local ? {
-          ...initial,
-          ...local,
-          settings: { ...initial.settings, ...(local.settings || {}) },
-          history: local.history || [],
-          projects: local.projects || [],
-          farms: local.farms || [],
-          achievements: local.achievements || {},
-          localTools: local.localTools || [],
-          pledges: local.pledges || [],
-        } : initial);
-        setHydrated(true);
-        requestAnimationFrame(() => { isApplyingRemote.current = false; });
+        // Apps Script 실패 → 이미 로컬 데이터가 표시된 상태이므로 그대로 유지
       }
     };
 
