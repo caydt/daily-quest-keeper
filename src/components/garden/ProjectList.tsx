@@ -15,6 +15,7 @@ import {
   X,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Pencil,
   MoveRight,
   ExternalLink,
@@ -474,6 +475,10 @@ export function FarmCard({
   onUpdateProject,
   settings,
   onAddTasksToProject,
+  isFirst,
+  isLast,
+  onMoveUp,
+  onMoveDown,
 }: {
   farm: Farm;
   trees: Project[];
@@ -494,6 +499,10 @@ export function FarmCard({
   onUpdateProject: (id: string, patch: { aiUrl?: string }) => void;
   settings: Settings;
   onAddTasksToProject: (projectId: string | null, titles: string[]) => void;
+  isFirst: boolean;
+  isLast: boolean;
+  onMoveUp: (farmId: string) => void;
+  onMoveDown: (farmId: string) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -574,6 +583,26 @@ export function FarmCard({
         )}
 
         <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            aria-label="농장 위로 이동"
+            disabled={isFirst}
+            onClick={(e) => { e.stopPropagation(); onMoveUp(farm.id); }}
+            className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+            title="농장 위로 이동"
+          >
+            <ChevronUp className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            aria-label="농장 아래로 이동"
+            disabled={isLast}
+            onClick={(e) => { e.stopPropagation(); onMoveDown(farm.id); }}
+            className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+            title="농장 아래로 이동"
+          >
+            <ChevronDown className="size-3.5" />
+          </button>
           {(settings.aiChatEnabled ?? true) && (
             <button
               onClick={(e) => { e.stopPropagation(); setShowAiChat((v) => !v); }}
@@ -895,7 +924,7 @@ export function ProjectList({
       )}
 
       {/* 농장들 */}
-      {sortedFarms.map(farm => (
+      {sortedFarms.map((farm, idx) => (
         <FarmCard
           key={farm.id}
           farm={farm}
@@ -917,6 +946,10 @@ export function ProjectList({
           onUpdateProject={onUpdateProject}
           settings={settings}
           onAddTasksToProject={onAddTasksToProject}
+          isFirst={idx === 0}
+          isLast={idx === sortedFarms.length - 1}
+          onMoveUp={() => {}}
+          onMoveDown={() => {}}
         />
       ))}
 
