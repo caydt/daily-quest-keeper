@@ -835,6 +835,29 @@ export function useGarden() {
     }));
   }, []);
 
+  const moveFarm = useCallback((id: string, direction: "up" | "down") => {
+    setState((s) => {
+      const sorted = [...s.farms].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const idx = sorted.findIndex((f) => f.id === id);
+      if (idx === -1) return s;
+      const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= sorted.length) return s;
+
+      const a = sorted[idx];
+      const b = sorted[swapIdx];
+      const orderA = a.order ?? idx;
+      const orderB = b.order ?? swapIdx;
+      return {
+        ...s,
+        farms: s.farms.map((f) => {
+          if (f.id === a.id) return { ...f, order: orderB };
+          if (f.id === b.id) return { ...f, order: orderA };
+          return f;
+        }),
+      };
+    });
+  }, []);
+
   // 나무(프로젝트)를 농장으로 이동하거나 독립 나무로 전환
   const moveProjectToFarm = useCallback((projectId: string, farmId: string | null) => {
     setState((s) => ({
@@ -955,6 +978,7 @@ export function useGarden() {
     deleteFarm,
     updateFarm,
     toggleFarmTool,
+    moveFarm,
     moveProjectToFarm,
     updateProject,
     setCondition,
