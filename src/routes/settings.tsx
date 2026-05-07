@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useGarden } from "@/lib/garden-store";
 import { requestNotificationPermission } from "@/lib/notifications";
 import { getScriptUrl, setScriptUrl, testScriptUrl } from "@/lib/sheets-adapter";
@@ -27,6 +27,12 @@ function SettingsPage() {
   const [aiModel, setAiModel] = useState(state.settings.aiModel ?? "");
   const [aiTestState, setAiTestState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [aiTestError, setAiTestError] = useState("");
+  const [toolsSheetUrlInput, setToolsSheetUrlInput] = useState(state.settings.toolsSheetUrl ?? "");
+
+  // 외부에서 garden state가 변하면 local 인풋도 동기화 (다른 디바이스 sync 등)
+  useEffect(() => {
+    setToolsSheetUrlInput(state.settings.toolsSheetUrl ?? "");
+  }, [state.settings.toolsSheetUrl]);
 
   const handleSaveScriptUrl = () => {
     setScriptUrl(scriptUrl.trim());
@@ -352,13 +358,26 @@ function doPost(e) {
             </div>
           </div>
 
-          <input
-            type="url"
-            placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=0"
-            value={state.settings.toolsSheetUrl ?? ""}
-            onChange={(e) => updateSettings({ toolsSheetUrl: e.target.value })}
-            className="w-full px-3 py-2.5 rounded-xl bg-input/40 border border-white/10 text-sm focus:border-primary/40 focus:outline-none"
-          />
+          <div className="flex gap-2">
+            <input
+              type="url"
+              placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=0"
+              value={toolsSheetUrlInput}
+              onChange={(e) => setToolsSheetUrlInput(e.target.value)}
+              className="flex-1 px-3 py-2.5 rounded-xl bg-input/40 border border-white/10 text-sm focus:border-primary/40 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() =>
+                updateSettings({
+                  toolsSheetUrl: toolsSheetUrlInput.trim() || undefined,
+                })
+              }
+              className="px-4 py-2 rounded-xl bg-primary/15 border border-primary/40 text-primary text-sm font-semibold hover:bg-primary/25 transition shrink-0"
+            >
+              저장
+            </button>
+          </div>
 
           <div className="rounded-2xl bg-background/40 border border-white/10 p-4 text-xs text-muted-foreground space-y-2">
             <div className="font-semibold text-foreground">📋 시트 준비 방법</div>
