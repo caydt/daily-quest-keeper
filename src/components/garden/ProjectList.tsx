@@ -394,6 +394,7 @@ function ProjectCard({
                 selectedIds={p.toolIds ?? []}
                 onToggle={onToggleProjectTool}
                 onClose={() => setShowProjectPicker(false)}
+                recommendForTitle={p.title}
               />
             )}
           </div>
@@ -671,6 +672,7 @@ export function FarmCard({
             selectedIds={farm.toolIds ?? []}
             onToggle={(toolId) => onToggleFarmTool(toolId)}
             onClose={() => setShowFarmPicker(false)}
+            recommendForTitle={farm.title}
           />
         )}
       </div>
