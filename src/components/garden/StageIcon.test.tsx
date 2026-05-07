@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import { TreeStageIcon } from "./StageIcon";
+import { TreeStageIcon, FarmStageIcon } from "./StageIcon";
 
 describe("TreeStageIcon", () => {
   it("tier 1 → Sprout 아이콘 + tier 데이터 속성", () => {
@@ -44,5 +44,42 @@ describe("TreeStageIcon", () => {
       const { container } = render(<TreeStageIcon tier={t} />);
       expect(container.querySelector("[data-stage-halo]")).not.toBeInTheDocument();
     }
+  });
+});
+
+describe("FarmStageIcon", () => {
+  it("tier 1 → Mountain 아이콘", () => {
+    const { container } = render(<FarmStageIcon tier={1} />);
+    expect(
+      container.querySelector("[data-stage-tier='1'] [data-lucide-icon='mountain']"),
+    ).toBeInTheDocument();
+  });
+
+  it("tier 2 → Sprout 아이콘", () => {
+    const { container } = render(<FarmStageIcon tier={2} />);
+    expect(
+      container.querySelector("[data-stage-tier='2'] [data-lucide-icon='sprout']"),
+    ).toBeInTheDocument();
+  });
+
+  it("tier 3 → TreePine 아이콘", () => {
+    const { container } = render(<FarmStageIcon tier={3} />);
+    expect(
+      container.querySelector("[data-stage-tier='3'] [data-lucide-icon='tree-pine']"),
+    ).toBeInTheDocument();
+  });
+
+  it("tier 4 → Wheat 아이콘", () => {
+    const { container } = render(<FarmStageIcon tier={4} />);
+    expect(
+      container.querySelector("[data-stage-tier='4'] [data-lucide-icon='wheat']"),
+    ).toBeInTheDocument();
+  });
+
+  it("tier 5 → Castle 아이콘 + halo", () => {
+    const { container } = render(<FarmStageIcon tier={5} />);
+    const root = container.querySelector("[data-stage-tier='5']");
+    expect(root?.querySelector("[data-lucide-icon='castle']")).toBeInTheDocument();
+    expect(root?.querySelector("[data-stage-halo]")).toBeInTheDocument();
   });
 });
