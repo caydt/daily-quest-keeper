@@ -185,3 +185,9 @@
 }
 .animate-shimmer { animation: shimmer 2.4s linear infinite; }
 
+
+@keyframes stage-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+.animate-stage-pop { animation: stage-pop 0.4s ease-out; }
