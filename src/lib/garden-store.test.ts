@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { useGarden, type Farm } from "./garden-store";
+import { useGarden, type Farm, farmStage } from "./garden-store";
 
 const STORAGE_KEY = "lumi-garden-v3";
 const SCRIPT_URL_KEY = "lumi-script-url";
@@ -202,5 +202,23 @@ describe("hydrate/save race", () => {
     });
 
     expect(fetchCtrl.postCalls).toHaveLength(0);
+  });
+});
+
+describe("farmStage tier", () => {
+  it("treeCount 0 → tier 1 (빈 땅)", () => {
+    expect(farmStage(0, 0).tier).toBe(1);
+  });
+  it("treeCount 1 → tier 2 (묘목장)", () => {
+    expect(farmStage(1, 50).tier).toBe(2);
+  });
+  it("treeCount 2 → tier 3 (정원)", () => {
+    expect(farmStage(2, 30).tier).toBe(3);
+  });
+  it("treeCount 3 + avgPct 60 → tier 4 (농장)", () => {
+    expect(farmStage(3, 60).tier).toBe(4);
+  });
+  it("treeCount 5 + avgPct 90 → tier 5 (마을)", () => {
+    expect(farmStage(5, 90).tier).toBe(5);
   });
 });

@@ -99,12 +99,12 @@ export const treeStage = (
 export const farmStage = (
   treeCount: number,
   avgPct: number,
-): { icon: string; label: string } => {
-  if (treeCount === 0)             return { icon: "🪨", label: "빈 땅"   };
-  if (treeCount >= 5 && avgPct >= 80) return { icon: "🏡", label: "마을"   };
-  if (treeCount >= 3 && avgPct >= 50) return { icon: "🌾", label: "농장"   };
-  if (treeCount >= 2)              return { icon: "🌱", label: "정원"   };
-  return                                   { icon: "🪴", label: "묘목장" };
+): { icon: string; label: string; tier: number } => {
+  if (treeCount === 0)                return { icon: "🪨", label: "빈 땅",   tier: 1 };
+  if (treeCount >= 5 && avgPct >= 80) return { icon: "🏡", label: "마을",   tier: 5 };
+  if (treeCount >= 3 && avgPct >= 50) return { icon: "🌾", label: "농장",   tier: 4 };
+  if (treeCount >= 2)                 return { icon: "🌱", label: "정원",   tier: 3 };
+  return                                     { icon: "🪴", label: "묘목장", tier: 2 };
 };
 
 export type Achievement = {
