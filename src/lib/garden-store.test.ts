@@ -235,6 +235,32 @@ describe("hydrate/save race", () => {
     expect(ids).not.toContain("remote-x");
     expect(ids).toContain("local-a");
   });
+
+  it("[userTouched] hydrate 후 사용자 액션 없음 → 도착하는 원격 응답이 정상 적용", async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ farms: [farm("local-a", 0, "로컬 농장")] }),
+    );
+    const { result } = renderHook(() => useGarden());
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    // 사용자 액션 없이 원격 응답 도착
+    await act(async () => {
+      fetchCtrl.resolveGet({
+        farms: [farm("remote-x", 0, "원격 농장")],
+        projects: [],
+        tasks: [],
+      });
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    await waitFor(() => expect(result.current.syncReady).toBe(true));
+
+    // 원격이 정상 적용 → 로컬 농장 사라지고 원격 농장만 남음
+    const ids = result.current.state.farms.map((f) => f.id);
+    expect(ids).toContain("remote-x");
+    expect(ids).not.toContain("local-a");
+  });
 });
 
 describe("farmStage tier", () => {
