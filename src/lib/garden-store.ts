@@ -322,6 +322,7 @@ export function useGarden() {
   const [syncReady, setSyncReady] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const isApplyingRemote = useRef(false);
+  const userTouched = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -376,6 +377,10 @@ export function useGarden() {
           return;
         }
 
+        // 사용자가 hydrate 후 입력/액션을 했으면 원격 적용 스킵.
+        // 이후 save effect가 local→remote 동기화 처리. 다음 새로고침/focus 시 sync.
+        if (userTouched.current) return;
+
         // 원격 데이터가 있으면 갱신 (로컬보다 우선).
         // mergeState와 동일한 settings 계산 후 morningTime 추출 → migrate/평가 boundary 일치 보장.
         const mergedSettings = { ...initial.settings, ...(remote.settings || {}) };
@@ -391,6 +396,14 @@ export function useGarden() {
     run();
     return () => { cancelled = true; };
   }, []);
+
+  // 사용자 액션으로 state가 변경되면 userTouched=true.
+  // 원격 적용(applyState in hydrate/focus-refetch)은 isApplyingRemote.current=true 동안 실행되므로 false-positive 차단됨.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (isApplyingRemote.current) return;
+    userTouched.current = true;
+  }, [state, hydrated]);
 
   // 저장: StorageAdapter 기반 debounce 저장
   useEffect(() => {

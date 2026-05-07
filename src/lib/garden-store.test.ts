@@ -203,6 +203,38 @@ describe("hydrate/save race", () => {
 
     expect(fetchCtrl.postCalls).toHaveLength(0);
   });
+
+  it("[userTouched] hydrate 후 사용자 액션 → 도착하는 원격 응답을 적용하지 않음", async () => {
+    // 로컬 시드: 농장 1개
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ farms: [farm("local-a", 0, "로컬 농장")] }),
+    );
+    const { result } = renderHook(() => useGarden());
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    // 사용자 액션: 새 농장 추가 (state 변경 → userTouched=true)
+    await act(async () => {
+      result.current.addFarm("새 농장");
+    });
+
+    // 원격 응답 도착: 다른 농장 데이터
+    await act(async () => {
+      fetchCtrl.resolveGet({
+        farms: [farm("remote-x", 0, "원격 농장")],
+        projects: [],
+        tasks: [],
+      });
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    await waitFor(() => expect(result.current.syncReady).toBe(true));
+
+    // 원격이 적용되지 않아야 함 → 로컬+사용자 액션의 결과 유지
+    const ids = result.current.state.farms.map((f) => f.id);
+    expect(ids).not.toContain("remote-x");
+    expect(ids).toContain("local-a");
+  });
 });
 
 describe("farmStage tier", () => {
