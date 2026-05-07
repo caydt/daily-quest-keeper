@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Project, Task, Farm } from "@/lib/garden-store";
-import { levelFromXp, treeStage, farmStage } from "@/lib/garden-store";
+import { levelFromXp, treeStage, farmStage, splitMultilinePaste } from "@/lib/garden-store";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -417,6 +417,16 @@ function ProjectCard({
               value={subTaskTitle}
               onChange={(e) => setSubTaskTitle(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Escape") { setShowSubTaskAdd(false); setSubTaskTitle(""); } }}
+              onPaste={(e) => {
+                const text = e.clipboardData.getData("text");
+                if (!text.includes("\n")) return;
+                e.preventDefault();
+                const titles = splitMultilinePaste(text);
+                if (titles.length === 0) return;
+                for (const t of titles) onAddSubTask(p.id, t);
+                setSubTaskTitle("");
+                setShowSubTaskAdd(false);
+              }}
               placeholder="할일 입력..."
               className="flex-1 px-3 py-1.5 rounded-lg bg-input/40 border border-accent/20 text-xs focus:border-accent/50 focus:outline-none"
             />
@@ -682,6 +692,16 @@ export function FarmCard({
             autoFocus
             value={inlineTitle}
             onChange={(e) => setInlineTitle(e.target.value)}
+            onPaste={(e) => {
+              const text = e.clipboardData.getData("text");
+              if (!text.includes("\n")) return;
+              e.preventDefault();
+              const titles = splitMultilinePaste(text);
+              if (titles.length === 0) return;
+              for (const t of titles) onAddTree(farm.id, t);
+              setInlineTitle("");
+              setShowInlineAdd(false);
+            }}
             placeholder="나무 이름 입력..."
             className="flex-1 bg-input/40 border border-emerald-500/20 rounded-lg px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none"
             onKeyDown={(e) => { if (e.key === "Escape") { setShowInlineAdd(false); setInlineTitle(""); } }}
@@ -874,6 +894,17 @@ export function ProjectList({
             <input
               value={farmTitle}
               onChange={e => setFarmTitle(e.target.value)}
+              onPaste={(e) => {
+                const text = e.clipboardData.getData("text");
+                if (!text.includes("\n")) return;
+                e.preventDefault();
+                const titles = splitMultilinePaste(text);
+                if (titles.length === 0) return;
+                for (const t of titles) onAddFarm(t, farmIcon);
+                setFarmTitle("");
+                setFarmIcon("🌾");
+                setShowAddFarm(false);
+              }}
               placeholder="농장 이름 (예: 내 앱 개발)"
               className="flex-1 bg-transparent border-b border-white/10 focus:border-emerald-400 outline-none px-2 py-2 text-sm font-medium"
               autoFocus
@@ -895,6 +926,18 @@ export function ProjectList({
           <input
             value={title}
             onChange={e => setTitle(e.target.value)}
+            onPaste={(e) => {
+              const text = e.clipboardData.getData("text");
+              if (!text.includes("\n")) return;
+              e.preventDefault();
+              const titles = splitMultilinePaste(text);
+              if (titles.length === 0) return;
+              for (const t of titles) onAdd(t);
+              setTitle("");
+              setDescription("");
+              setDueDate("");
+              setShowAddProject(false);
+            }}
             placeholder="나무 이름 (프로젝트)"
             className="w-full bg-transparent border-b border-white/10 focus:border-primary outline-none px-2 py-2 text-sm font-medium"
             autoFocus
