@@ -130,8 +130,8 @@ export type GardenState = {
   settings: Settings;
   history: DayLog[];
   achievements: Record<string, number>; // id -> unlockedAt timestamp
-  condition: ConditionMode | null;     // 오늘 컨디션 (null = 아직 미선택)
-  conditionSetOn: string | null;       // YYYY-MM-DD: 언제 설정했는지
+  condition: ConditionMode | null;     // 현재 컨디션 (null = 아직 미선택)
+  conditionSetAt: number | null;       // epoch ms: 언제 설정했는지 (morningTime 기준 day-window 비교용)
   localTools: Tool[];                  // 앱 안에서 직접 등록한 도구들
   pledges: Pledge[];
 };
@@ -178,6 +178,63 @@ export const todayStr = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
+// morningTime ("HH:MM") 파싱. 빈 값 또는 잘못된 형식이면 fallback [8, 0] (initial 기본값과 일치).
+// 사용자가 settings에서 time input을 비우거나 잘못된 데이터가 storage에서 로드되는 경우 NaN 전파 방지.
+const parseMorningTime = (mt: string): [number, number] => {
+  const m = mt?.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return [8, 0];
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (!Number.isFinite(h) || h < 0 || h > 23 || !Number.isFinite(min) || min < 0 || min > 59) return [8, 0];
+  return [h, min];
+};
+
+// 옛 스키마(conditionSetOn: "YYYY-MM-DD") → 새 스키마(conditionSetAt: epoch ms) 변환.
+// sheets 동기화 사용자의 local snapshot이 옛 스키마인 채로 hydrate되는 경우를 처리.
+//
+// 변환 규칙: 그 날 morningTime의 timestamp로 stamp.
+//   - 사용자의 실제 pick 시각은 모르지만 (옛 데이터엔 시각 없음), 그 날의 morningTime이 곧 그 day-window의 시작점이므로
+//     비교 시 동일 윈도우 내로 평가됨.
+//   - morningTime은 호출자가 명시. 호출자는 "이 데이터가 머지된 후 effective morningTime"을 전달해야 함
+//     (예: focus-refetch에서 remote가 settings 없으면 prev.settings.morningTime을 전달).
+//
+// 변환은 입력 객체를 mutate (mergeState 직전 호출 가정).
+export const migrateLegacyCondition = (
+  data: Partial<GardenState> & { conditionSetOn?: string },
+  morningTime: string,
+): void => {
+  if (data.conditionSetAt != null) return;
+  if (typeof data.conditionSetOn !== "string") return;
+  const m = data.conditionSetOn.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return;
+  const [h, mm] = parseMorningTime(morningTime);
+  data.conditionSetAt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), h, mm, 0, 0).getTime();
+};
+
+// 컨디션 reset 기준점: 가장 최근에 지나간 morningTime의 epoch ms.
+// 예: morningTime "07:00", 지금이 06:59 → 어제 07:00 timestamp.
+//     지금이 07:01 → 오늘 07:00 timestamp.
+// 이 시각 이후에 setCondition된 값만 todayCondition으로 노출.
+// timestamp 기반이라 morningTime 변경에도 안정적.
+export const lastMorningCrossing = (morningTime: string, now: Date = new Date()): number => {
+  const [h, m] = parseMorningTime(morningTime);
+  const morningToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0, 0);
+  if (now.getTime() < morningToday.getTime()) {
+    morningToday.setDate(morningToday.getDate() - 1);
+  }
+  return morningToday.getTime();
+};
+
+// setCondition이 stamp할 timestamp 계산.
+// 사용자가 morningTime 이전에 picked → stamp = 오늘 morningTime (오늘 새 윈도우까지 커버).
+// 사용자가 morningTime 이후에 picked → stamp = now (현재 윈도우 커버).
+// 의도: 같은 calendar day 안에서 picker가 두 번 뜨는 일 방지.
+export const conditionStampFor = (morningTime: string, now: Date = new Date()): number => {
+  const [h, m] = parseMorningTime(morningTime);
+  const todayMorning = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0, 0);
+  return Math.max(now.getTime(), todayMorning.getTime());
+};
+
 export const addDays = (dateStr: string, days: number) => {
   const [y, m, d] = dateStr.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
@@ -220,7 +277,7 @@ const initial: GardenState = {
   history: [],
   achievements: {},
   condition: null,
-  conditionSetOn: null,
+  conditionSetAt: null,
   localTools: [],
   pledges: [],
 };
@@ -294,6 +351,11 @@ export function useGarden() {
       // ① 로컬 데이터 즉시 로드 → 빈 화면 없이 바로 렌더
       const local = await createLocalAdapter().load();
       if (cancelled) return;
+      if (local) {
+        // mergeState와 동일한 settings 계산을 먼저 수행 → migrate boundary와 todayCondition 평가 boundary 일치 보장.
+        const mergedSettings = { ...initial.settings, ...(local.settings || {}) };
+        migrateLegacyCondition(local, mergedSettings.morningTime);
+      }
       applyState(local ? mergeState(local) : initial);
       setHydrated(true);
 
@@ -314,7 +376,10 @@ export function useGarden() {
           return;
         }
 
-        // 원격 데이터가 있으면 갱신 (로컬보다 우선)
+        // 원격 데이터가 있으면 갱신 (로컬보다 우선).
+        // mergeState와 동일한 settings 계산 후 morningTime 추출 → migrate/평가 boundary 일치 보장.
+        const mergedSettings = { ...initial.settings, ...(remote.settings || {}) };
+        migrateLegacyCondition(remote, mergedSettings.morningTime);
         applyState(mergeState(remote));
       } catch {
         // Apps Script 실패 → 이미 로컬 데이터가 표시된 상태이므로 그대로 유지
@@ -366,17 +431,24 @@ export function useGarden() {
         const remote = await createSheetsAdapter(scriptUrl).load();
         if (!remote) return;
         isApplyingRemote.current = true;
-        setState((prev) => ({
-          ...initial,
-          ...remote,
-          settings: { ...initial.settings, ...(remote.settings || prev.settings) },
-          history: remote.history || [],
-          projects: remote.projects || [],
-          farms: remote.farms || [],
-          achievements: remote.achievements || {},
-          localTools: remote.localTools || [],
-          pledges: remote.pledges || [],
-        }));
+        setState((prev) => {
+          // 실제 머지될 settings를 먼저 계산해서 migrate에 같은 morningTime을 전달.
+          // remote.settings가 partial(예: {})이면 spread는 initial.settings.morningTime을 그대로 둠.
+          // remote.settings가 null/undefined면 prev.settings 사용.
+          const mergedSettings = { ...initial.settings, ...(remote.settings || prev.settings) };
+          migrateLegacyCondition(remote, mergedSettings.morningTime);
+          return {
+            ...initial,
+            ...remote,
+            settings: mergedSettings,
+            history: remote.history || [],
+            projects: remote.projects || [],
+            farms: remote.farms || [],
+            achievements: remote.achievements || {},
+            localTools: remote.localTools || [],
+            pledges: remote.pledges || [],
+          };
+        });
         requestAnimationFrame(() => { isApplyingRemote.current = false; });
       } catch {
         /* 무시 */
@@ -917,7 +989,7 @@ export function useGarden() {
     setState((s) => ({
       ...s,
       condition: mode,
-      conditionSetOn: todayStr(),
+      conditionSetAt: conditionStampFor(s.settings.morningTime),
     }));
   }, []);
 
@@ -956,9 +1028,12 @@ export function useGarden() {
     }
   }, [state, hydrated, syncReady]);
 
-  // 오늘 컨디션이 설정됐는지 여부 (날짜 기준 자동 초기화)
+  // 컨디션은 morningTime 기준 하루 단위로 reset. 새 day-window의 첫 접속 시 picker.
+  // timestamp 기반이라 morningTime 변경에도 안정적 — 설정값 바꿔도 같은 window 내라면 유지.
   const todayCondition: ConditionMode | null =
-    state.conditionSetOn === todayStr() ? state.condition : null;
+    state.conditionSetAt != null && state.conditionSetAt >= lastMorningCrossing(state.settings.morningTime)
+      ? state.condition
+      : null;
 
   return {
     state,
