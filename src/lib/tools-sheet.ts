@@ -145,6 +145,20 @@ export const findToolById = (tools: Tool[], savedId: string): Tool | undefined =
   return tools.find((t) => t.name.toLowerCase().replace(/\s+/g, "-") === slug);
 };
 
+// 농장/프로젝트 제목과 도구의 카테고리/태그가 단어 단위로 정확 일치하는지 검사.
+// 단어 단위: 제목을 공백으로 split → 각 단어가 도구.category 정확 일치 또는
+//   도구.tags의 어느 항목과 정확 일치하면 매치.
+// 케이스 무시. 부분 문자열 매칭은 의도적으로 제외 (오버매칭 방지).
+export const matchToolsForTitle = (title: string, tools: Tool[]): Tool[] => {
+  const words = title.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [];
+  return tools.filter((tool) => {
+    const cat = tool.category?.toLowerCase().trim();
+    const tagSet = new Set(tool.tags.map((t) => t.toLowerCase().trim()));
+    return words.some((w) => w === cat || tagSet.has(w));
+  });
+};
+
 export function useToolsSheet(sheetUrl: string | undefined) {
   const [tools, setTools] = useState<Tool[]>([]);
   const [loading, setLoading] = useState(false);
