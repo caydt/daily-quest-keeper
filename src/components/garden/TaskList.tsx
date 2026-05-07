@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Task, TaskKind } from "@/lib/garden-store";
-import { XP_REWARD, XP_PENALTY } from "@/lib/garden-store";
+import { XP_REWARD, XP_PENALTY, splitMultilinePaste } from "@/lib/garden-store";
 import {
   SortableContext,
   verticalListSortingStrategy,
@@ -219,6 +219,15 @@ export function TaskList({ tasks, onToggle, onDelete, onPostpone, onAdd, onReord
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
+          onPaste={(e) => {
+            const text = e.clipboardData.getData("text");
+            if (!text.includes("\n")) return;
+            e.preventDefault();
+            const titles = splitMultilinePaste(text);
+            if (titles.length === 0) return;
+            for (const t of titles) onAdd(t, time, difficulty, kind);
+            setTitle("");
+          }}
           placeholder="새로운 씨앗 심기..."
           className="w-full bg-transparent border-b border-white/10 focus:border-primary outline-none px-2 py-2 text-sm"
         />
