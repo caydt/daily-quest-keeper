@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import type { Farm, Project } from "@/lib/garden-store";
 import { useGarden, treeStage, farmStage } from "@/lib/garden-store";
 import { ArrowLeft } from "lucide-react";
+import { TreeStageIcon, FarmStageIcon } from "@/components/garden/StageIcon";
 
 export const Route = createFileRoute("/map")({
   head: () => ({
@@ -110,7 +111,7 @@ function FarmTerritory({
 }: {
   farm: Farm;
   treeData: TreeData[];
-  stage: { icon: string; label: string };
+  stage: { icon: string; label: string; tier: number };
   avgPct: number;
 }) {
   return (
@@ -124,7 +125,7 @@ function FarmTerritory({
     >
       {/* 농장 헤더 */}
       <div className="px-5 pt-5 pb-3 flex items-center gap-3">
-        <span className="text-3xl">{stage.icon}</span>
+        <FarmStageIcon tier={stage.tier as 1 | 2 | 3 | 4 | 5} size={40} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h2 className="font-bold text-emerald-300 truncate">{farm.title}</h2>
@@ -193,16 +194,8 @@ function TreeNode({
       }`}
       title={tree.title}
     >
-      {/* 원형 아이콘 */}
-      <div
-        className={`size-16 rounded-full flex items-center justify-center text-2xl border-2 transition-all ${
-          tree.completed
-            ? "border-primary/30 bg-primary/10"
-            : "border-accent/30 bg-card/60 group-hover/tree:border-accent/70 group-hover/tree:bg-accent/10"
-        }`}
-      >
-        {stage.icon}
-      </div>
+      {/* 원형 스테이지 배지 */}
+      <TreeStageIcon tier={stage.tier as 1 | 2 | 3 | 4 | 5} size={64} />
 
       {/* 제목 */}
       <p className="text-[10px] text-center text-muted-foreground leading-tight line-clamp-2 w-full group-hover/tree:text-foreground transition-colors">
