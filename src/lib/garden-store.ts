@@ -235,6 +235,11 @@ export const conditionStampFor = (morningTime: string, now: Date = new Date()): 
   return Math.max(now.getTime(), todayMorning.getTime());
 };
 
+// 멀티라인 paste 텍스트를 트리밍된 줄 배열로 변환. 빈 줄은 제거. CRLF/LF 둘 다 지원.
+// 사용처: TaskList/ProjectList의 add input에서 onPaste 핸들러로 줄별 일괄 생성.
+export const splitMultilinePaste = (text: string): string[] =>
+  text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+
 export const addDays = (dateStr: string, days: number) => {
   const [y, m, d] = dateStr.split("-").map(Number);
   const dt = new Date(y, m - 1, d);

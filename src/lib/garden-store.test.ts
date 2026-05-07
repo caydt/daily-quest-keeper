@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { useGarden, type Farm, farmStage, lastMorningCrossing, migrateLegacyCondition, conditionStampFor } from "./garden-store";
+import { useGarden, type Farm, farmStage, lastMorningCrossing, migrateLegacyCondition, conditionStampFor, splitMultilinePaste } from "./garden-store";
 
 const STORAGE_KEY = "lumi-garden-v3";
 const SCRIPT_URL_KEY = "lumi-script-url";
@@ -470,5 +470,29 @@ describe("[P1 회귀 방지] morningTime 빈/잘못된 값에 대한 NaN 가드"
   it("conditionStampFor — 잘못된 형식 → fallback 08:00", () => {
     const at = new Date(2026, 4, 7, 6, 30);
     expect(conditionStampFor("invalid", at)).toBe(new Date(2026, 4, 7, 8, 0).getTime());
+  });
+});
+
+describe("splitMultilinePaste", () => {
+  it("LF 줄바꿈 → 줄별 배열", () => {
+    expect(splitMultilinePaste("a\nb\nc")).toEqual(["a", "b", "c"]);
+  });
+
+  it("앞뒤 공백 트림 + 빈 줄 제거", () => {
+    expect(splitMultilinePaste("  a  \n\n  b  ")).toEqual(["a", "b"]);
+  });
+
+  it("단일 라인도 한 항목 배열로", () => {
+    expect(splitMultilinePaste("single")).toEqual(["single"]);
+  });
+
+  it("CRLF (Windows) 줄바꿈도 처리", () => {
+    expect(splitMultilinePaste("a\r\nb")).toEqual(["a", "b"]);
+  });
+
+  it("빈 문자열/공백만 → 빈 배열", () => {
+    expect(splitMultilinePaste("")).toEqual([]);
+    expect(splitMultilinePaste("   ")).toEqual([]);
+    expect(splitMultilinePaste("\n\n")).toEqual([]);
   });
 });
