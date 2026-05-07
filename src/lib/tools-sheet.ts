@@ -115,7 +115,7 @@ function rowsToTools(rows: string[][]): Tool[] {
     const url = normalizeUrl(rawUrl);
     if (!name || !url) continue;
     tools.push({
-      id: `row-${r}-${name.toLowerCase().replace(/\s+/g, "-")}`,
+      id: url,  // URL을 ID로 사용 — 시트 정렬·이름 변경에 안정적
       name,
       url,
       category: iCat >= 0 ? row[iCat]?.trim() : undefined,
@@ -132,6 +132,18 @@ function rowsToTools(rows: string[][]): Tool[] {
   }
   return tools;
 }
+
+// 저장된 toolId가 새 형식(URL)이면 그대로 lookup,
+// 옛 형식("row-3-figma")이면 slug 추출 후 같은 name(slug 비교)으로 fallback.
+// 옛 데이터(2026-05 이전 row 기반 ID로 저장된 farm/project/task.toolIds) 호환용.
+export const findToolById = (tools: Tool[], savedId: string): Tool | undefined => {
+  const direct = tools.find((t) => t.id === savedId);
+  if (direct) return direct;
+  const m = savedId.match(/^row-\d+-(.+)$/);
+  if (!m) return undefined;
+  const slug = m[1];
+  return tools.find((t) => t.name.toLowerCase().replace(/\s+/g, "-") === slug);
+};
 
 export function useToolsSheet(sheetUrl: string | undefined) {
   const [tools, setTools] = useState<Tool[]>([]);
