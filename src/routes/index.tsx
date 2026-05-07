@@ -270,24 +270,39 @@ function Index() {
           </div>
         </header>
 
-        {/* 각오 보드 */}
-        <PledgeBoard pledges={state.pledges ?? []} onSet={setPledge} />
-
-        {/* Avatar HUD */}
-        <Avatar
-          totalXp={state.totalXp}
-          xp={state.xp}
-          combo={state.combo}
-          streak={state.streak}
-        />
-
-        {/* Main grid */}
+        {/* DnD 영역: TaskList의 task를 ProjectList의 project로 드래그하는 동작 때문에
+            DndContext가 두 컴포넌트를 모두 감싸야 함. PledgeBoard/Avatar는 DnD와 무관하지만
+            안에 있어도 무해. */}
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
+          {/* 오늘의 임무 — 헤더 바로 아래, 좁은 중앙 정렬 */}
+          <section className="max-w-3xl mx-auto">
+            <TaskList
+              tasks={visibleStandalone}
+              onToggle={toggleTask}
+              onDelete={deleteTask}
+              onPostpone={postponeTask}
+              onAdd={addTask}
+              onReorder={reorderTasks}
+            />
+          </section>
+
+          {/* 각오 보드 */}
+          <PledgeBoard pledges={state.pledges ?? []} onSet={setPledge} />
+
+          {/* Avatar HUD */}
+          <Avatar
+            totalXp={state.totalXp}
+            xp={state.xp}
+            combo={state.combo}
+            streak={state.streak}
+          />
+
+          {/* Main grid */}
           <main className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
             <div className="space-y-6 min-w-0">
               <ProjectList
@@ -312,14 +327,6 @@ function Index() {
                 settings={state.settings}
                 onAddTasksToProject={handleAddTasksToProject}
                 onMoveFarm={moveFarm}
-              />
-              <TaskList
-                tasks={visibleStandalone}
-                onToggle={toggleTask}
-                onDelete={deleteTask}
-                onPostpone={postponeTask}
-                onAdd={addTask}
-                onReorder={reorderTasks}
               />
             </div>
             <aside className="space-y-6">
