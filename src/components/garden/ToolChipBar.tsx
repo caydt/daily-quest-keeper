@@ -1,4 +1,4 @@
-import type { Tool } from "@/lib/tools-sheet";
+import { type Tool, findToolById } from "@/lib/tools-sheet";
 import { X, Plus } from "lucide-react";
 
 type Props = {
@@ -14,7 +14,7 @@ type Props = {
 
 export function ToolChipBar({ availableTools, toolIds, onRemove, onAdd }: Props) {
   const connected = toolIds
-    .map((id) => availableTools.find((t) => t.id === id))
+    .map((id) => findToolById(availableTools, id))
     .filter((t): t is Tool => t !== undefined);
 
   if (connected.length === 0 && !onAdd) return null;
