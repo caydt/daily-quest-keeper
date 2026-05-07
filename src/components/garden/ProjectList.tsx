@@ -24,6 +24,7 @@ import {
 import { ToolChipBar } from "@/components/garden/ToolChipBar";
 import { ToolPicker } from "@/components/garden/ToolPicker";
 import { AiChatPanel } from "@/components/garden/AiChatPanel";
+import { TreeStageIcon, FarmStageIcon } from "./StageIcon";
 import type { Tool } from "@/lib/tools-sheet";
 import type { Settings } from "@/lib/garden-store";
 import { buildProjectContext, buildFarmContext } from "@/lib/ai-context";
@@ -57,11 +58,8 @@ type Props = {
 function TreeIcon({ pct, completed }: { pct: number; completed: boolean }) {
   const stage = treeStage(pct, completed);
   return (
-    <span
-      className="text-2xl leading-none"
-      title={`${stage.label} (${Math.round(pct)}%)`}
-    >
-      {stage.icon}
+    <span title={`${stage.label} (${Math.round(pct)}%)`}>
+      <TreeStageIcon tier={stage.tier as 1 | 2 | 3 | 4 | 5} size={28} />
     </span>
   );
 }
@@ -536,7 +534,7 @@ export function FarmCard({
           {collapsed ? <ChevronRight className="size-4" /> : <ChevronDown className="size-4" />}
         </button>
 
-        <span className="text-2xl leading-none">{stage.icon}</span>
+        <FarmStageIcon tier={stage.tier as 1 | 2 | 3 | 4 | 5} size={28} />
 
         {editing ? (
           <form
