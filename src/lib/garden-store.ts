@@ -443,6 +443,9 @@ export function useGarden() {
       try {
         const remote = await createSheetsAdapter(scriptUrl).load();
         if (!remote) return;
+        // 한 세션 안에서는 사용자 입력 보존 우선. focus-refetch도 스킵.
+        // 다음 새로고침 시 hydrate 경로로 sync됨.
+        if (userTouched.current) return;
         isApplyingRemote.current = true;
         setState((prev) => {
           // 실제 머지될 settings를 먼저 계산해서 migrate에 같은 morningTime을 전달.
