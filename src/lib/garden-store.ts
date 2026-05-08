@@ -1008,14 +1008,18 @@ export function useGarden() {
     setStateUser((s) => ({
       ...s,
       localTools: s.localTools.filter((t) => t.id !== id),
-      // 연결된 할일/프로젝트에서도 제거
+      // 연결된 할일/프로젝트/농장에서도 제거 (dangling toolId 방지)
       tasks: s.tasks.map((t) => ({ ...t, toolIds: (t.toolIds ?? []).filter((x) => x !== id) })),
       projects: s.projects.map((p) => ({
         ...p,
         toolIds: (p.toolIds ?? []).filter((x) => x !== id),
       })),
+      farms: s.farms.map((f) => ({
+        ...f,
+        toolIds: (f.toolIds ?? []).filter((x) => x !== id),
+      })),
     }));
-  }, []);
+  }, [setStateUser]);
 
   const setCondition = useCallback((mode: ConditionMode) => {
     setStateUser((s) => ({

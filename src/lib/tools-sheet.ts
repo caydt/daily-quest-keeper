@@ -136,13 +136,17 @@ function rowsToTools(rows: string[][]): Tool[] {
 // 저장된 toolId가 새 형식(URL)이면 그대로 lookup,
 // 옛 형식("row-3-figma")이면 slug 추출 후 같은 name(slug 비교)으로 fallback.
 // 옛 데이터(2026-05 이전 row 기반 ID로 저장된 farm/project/task.toolIds) 호환용.
+// slug가 여러 도구와 매치되면 모호하므로 undefined 반환 — 잘못된 도구로 매핑되는 것보다
+// "(연결 끊김)" placeholder를 띄워 사용자가 직접 정리하도록 유도.
 export const findToolById = (tools: Tool[], savedId: string): Tool | undefined => {
   const direct = tools.find((t) => t.id === savedId);
   if (direct) return direct;
   const m = savedId.match(/^row-\d+-(.+)$/);
   if (!m) return undefined;
   const slug = m[1];
-  return tools.find((t) => t.name.toLowerCase().replace(/\s+/g, "-") === slug);
+  const matches = tools.filter((t) => t.name.toLowerCase().replace(/\s+/g, "-") === slug);
+  if (matches.length === 1) return matches[0];
+  return undefined;
 };
 
 // 농장/프로젝트 제목과 도구의 카테고리/태그가 단어 단위로 정확 일치하는지 검사.

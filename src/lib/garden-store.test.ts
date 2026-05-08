@@ -559,3 +559,26 @@ describe("splitMultilinePaste", () => {
     expect(splitMultilinePaste("\n\n")).toEqual([]);
   });
 });
+
+describe("[P2-C 회귀 방지] deleteLocalTool은 farms.toolIds에서도 제거", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("로컬 도구 삭제 시 농장에 연결된 toolId도 제거됨", async () => {
+    // 시드: 농장 A에 두 도구 연결, 농장 B에 첫 번째만 연결
+    const result = await seedAndHydrate([
+      { ...farm("farm-a", 0, "농장A"), toolIds: ["local-tool-1", "local-tool-2"] },
+      { ...farm("farm-b", 1, "농장B"), toolIds: ["local-tool-1"] },
+    ]);
+
+    act(() => {
+      result.current.deleteLocalTool("local-tool-1");
+    });
+
+    const farmsById = Object.fromEntries(result.current.state.farms.map((f) => [f.id, f]));
+    expect(farmsById["farm-a"].toolIds ?? []).not.toContain("local-tool-1");
+    expect(farmsById["farm-a"].toolIds ?? []).toContain("local-tool-2");
+    expect(farmsById["farm-b"].toolIds ?? []).not.toContain("local-tool-1");
+  });
+});

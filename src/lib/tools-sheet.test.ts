@@ -29,6 +29,15 @@ describe("findToolById", () => {
   it("잘못된 형식 (row 패턴 아님)도 그냥 undefined", () => {
     expect(findToolById(tools, "garbage-id")).toBeUndefined();
   });
+
+  it("[P2-B] 옛 형식 slug가 두 도구와 매치되면 모호 → undefined (잘못 매핑 방지)", () => {
+    const collision: Tool[] = [
+      tool("https://figma.com/work", "Figma", "https://figma.com/work", "design"),
+      tool("https://figma.com/play", "figma", "https://figma.com/play", "design"),
+    ];
+    // row-3-figma는 두 도구 모두 slug "figma"로 매치 → 모호하므로 undefined
+    expect(findToolById(collision, "row-3-figma")).toBeUndefined();
+  });
 });
 
 describe("matchToolsForTitle", () => {
