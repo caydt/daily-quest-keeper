@@ -1,9 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import QRCode from "react-qr-code";
 import { useGarden } from "@/lib/garden-store";
 import { requestNotificationPermission } from "@/lib/notifications";
 import { getScriptUrl, setScriptUrl, testScriptUrl } from "@/lib/sheets-adapter";
-import { ArrowLeft, Bell, BellOff, Sunrise, Moon, Wrench, ExternalLink, Link2, CheckCircle2, XCircle, Loader2, Save, Bot, ToggleLeft, ToggleRight } from "lucide-react";
+import { buildSetupLink, isValidScriptUrl } from "@/lib/setup-link";
+import { ArrowLeft, Bell, BellOff, Sunrise, Moon, Wrench, ExternalLink, Link2, CheckCircle2, XCircle, Loader2, Save, Bot, ToggleLeft, ToggleRight, Smartphone, Copy } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -28,6 +30,28 @@ function SettingsPage() {
   const [aiTestState, setAiTestState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [aiTestError, setAiTestError] = useState("");
   const [toolsSheetUrlInput, setToolsSheetUrlInput] = useState(state.settings.toolsSheetUrl ?? "");
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  // 셋업 링크는 저장된(=valid한) URL 기준으로 생성. 입력 중인 값으로 만들면 잘못된 링크가 공유될 수 있음.
+  const setupLink = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const url = scriptUrl.trim();
+    if (!isValidScriptUrl(url)) return null;
+    return buildSetupLink(url, window.location.origin + window.location.pathname);
+  }, [scriptUrl]);
+
+  const handleCopySetupLink = async () => {
+    if (!setupLink) return;
+    try {
+      await navigator.clipboard.writeText(setupLink);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 1500);
+    } catch {
+      // clipboard 권한 없으면 input select fallback
+      const input = document.getElementById("setup-link-input") as HTMLInputElement | null;
+      input?.select();
+    }
+  };
 
   const handleSaveScriptUrl = () => {
     setScriptUrl(scriptUrl.trim());
@@ -293,10 +317,54 @@ function SettingsPage() {
             </div>
           )}
 
-          <div className="rounded-2xl bg-amber-500/5 border border-amber-500/20 p-4 text-xs text-amber-200/80 space-y-1">
-            <p className="font-semibold text-amber-300">⚠️ 다른 기기에서 연동하려면</p>
-            <p>Script URL은 기기마다 직접 입력해야 합니다. 위 URL을 다른 기기의 설정 페이지에도 붙여넣고 저장하세요.</p>
-            <p className="pt-1 text-amber-200/60">연동이 안 된다면 → Apps Script 배포 시 <strong className="text-amber-300">액세스: 모든 사용자 (로그인 불필요)</strong> 로 설정했는지 확인하세요.</p>
+          {/* 기기 간 연동 — 셋업 링크 + QR */}
+          <div className="rounded-2xl bg-primary/5 border border-primary/20 p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <Smartphone className="size-4 text-primary mt-0.5 shrink-0" />
+              <div className="text-xs text-foreground/80 space-y-1">
+                <p className="font-semibold text-primary">다른 기기에서 같은 데이터 보기</p>
+                <p className="text-muted-foreground">
+                  아래 링크를 카톡/메모로 보내고 그 기기에서 한 번만 클릭하면 끝. PC는 링크 클릭, 폰은 QR 스캔도 가능해요.
+                </p>
+              </div>
+            </div>
+
+            {setupLink ? (
+              <>
+                <div className="flex gap-2">
+                  <input
+                    id="setup-link-input"
+                    type="text"
+                    readOnly
+                    value={setupLink}
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                    className="flex-1 px-3 py-2 rounded-xl bg-input/40 border border-white/10 text-xs font-mono text-muted-foreground"
+                  />
+                  <button
+                    onClick={() => void handleCopySetupLink()}
+                    className="px-3 py-2 rounded-xl border border-primary/40 bg-primary/15 text-primary text-xs font-semibold hover:bg-primary/25 transition flex items-center gap-1"
+                    aria-label="셋업 링크 복사"
+                  >
+                    {linkCopied ? <CheckCircle2 className="size-3.5" /> : <Copy className="size-3.5" />}
+                    {linkCopied ? "복사됨" : "복사"}
+                  </button>
+                </div>
+
+                <div className="flex justify-center pt-2">
+                  <div className="bg-white p-3 rounded-xl">
+                    <QRCode value={setupLink} size={160} />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-amber-300/80">
+                위에 유효한 Apps Script URL을 먼저 저장하면 셋업 링크와 QR이 여기에 나타나요.
+              </p>
+            )}
+
+            <p className="text-[11px] text-muted-foreground/70 pt-1 leading-relaxed">
+              ⚠️ 이 링크는 시트 접근 권한 그 자체예요. 다른 사람이 받으면 데이터를 볼 수 있으니 본인 기기로만 보내세요.
+            </p>
           </div>
 
           <div className="rounded-2xl bg-background/40 border border-white/10 p-4 text-xs text-muted-foreground space-y-2">
