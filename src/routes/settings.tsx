@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useGarden } from "@/lib/garden-store";
 import { requestNotificationPermission } from "@/lib/notifications";
 import { getScriptUrl, setScriptUrl, testScriptUrl } from "@/lib/sheets-adapter";
@@ -28,11 +28,6 @@ function SettingsPage() {
   const [aiTestState, setAiTestState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [aiTestError, setAiTestError] = useState("");
   const [toolsSheetUrlInput, setToolsSheetUrlInput] = useState(state.settings.toolsSheetUrl ?? "");
-
-  // 외부에서 garden state가 변하면 local 인풋도 동기화 (다른 디바이스 sync 등)
-  useEffect(() => {
-    setToolsSheetUrlInput(state.settings.toolsSheetUrl ?? "");
-  }, [state.settings.toolsSheetUrl]);
 
   const handleSaveScriptUrl = () => {
     setScriptUrl(scriptUrl.trim());
