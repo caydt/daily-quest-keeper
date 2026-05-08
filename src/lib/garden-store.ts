@@ -330,6 +330,16 @@ export function useGarden() {
   const userTouched = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 저장은 항상 직렬화. 두 POST가 동시에 in-flight면 도착 순서 역전으로 silent data loss 가능.
+  const inFlightSave = useRef<Promise<unknown>>(Promise.resolve());
+
+  // 사용자 mutator는 setState 호출 직전에 userTouched=true 동기 flip.
+  // 워처 useEffect로 미루면 effect run 전에 in-flight remote가 도착해 clobber되는 race가 있음.
+  type StateUpdater = GardenState | ((prev: GardenState) => GardenState);
+  const setStateUser = useCallback((updater: StateUpdater) => {
+    userTouched.current = true;
+    setState(updater);
+  }, []);
 
   // 로드: 로컬 먼저 즉시 렌더 → Apps Script 백그라운드 갱신
   useEffect(() => {
@@ -402,15 +412,9 @@ export function useGarden() {
     return () => { cancelled = true; };
   }, []);
 
-  // 사용자 액션으로 state가 변경되면 userTouched=true.
-  // 원격 적용(applyState in hydrate/focus-refetch)은 isApplyingRemote.current=true 동안 실행되므로 false-positive 차단됨.
-  useEffect(() => {
-    if (!hydrated) return;
-    if (isApplyingRemote.current) return;
-    userTouched.current = true;
-  }, [state, hydrated]);
+  // userTouched는 setStateUser 헬퍼에서 동기 flip. (워처 useEffect는 race 때문에 제거됨)
 
-  // 저장: StorageAdapter 기반 debounce 저장
+  // 저장: StorageAdapter 기반 debounce 저장. inFlightSave 체인으로 직렬화.
   useEffect(() => {
     if (!hydrated) return;
     if (!syncReady) return;
@@ -420,19 +424,23 @@ export function useGarden() {
     const adapter = scriptUrl ? createSheetsAdapter(scriptUrl) : createLocalAdapter();
 
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      setSaveStatus("saving");
-      try {
-        await adapter.save(state);
-        setSaveStatus("saved");
-        if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
-        savedResetTimer.current = setTimeout(() => setSaveStatus("idle"), 2000);
-      } catch {
-        await createLocalAdapter().save(state);
-        setSaveStatus("error");
-        if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
-        savedResetTimer.current = setTimeout(() => setSaveStatus("idle"), 3000);
-      }
+    saveTimer.current = setTimeout(() => {
+      const previous = inFlightSave.current;
+      inFlightSave.current = (async () => {
+        await previous.catch(() => {});
+        setSaveStatus("saving");
+        try {
+          await adapter.save(state);
+          setSaveStatus("saved");
+          if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
+          savedResetTimer.current = setTimeout(() => setSaveStatus("idle"), 2000);
+        } catch {
+          await createLocalAdapter().save(state);
+          setSaveStatus("error");
+          if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
+          savedResetTimer.current = setTimeout(() => setSaveStatus("idle"), 3000);
+        }
+      })();
     }, 600);
 
     return () => {
@@ -480,13 +488,16 @@ export function useGarden() {
     return () => window.removeEventListener("focus", onFocus);
   }, []);
 
-  // 일일 정산
+  // 일일 정산. 로컬 canonical state라 원격 적용에 덮이면 안 됨 → setStateUser.
+  // syncReady 전엔 fire 금지 — 원격이 더 최신 lastActiveDate를 가져올 가능성, 그리고 setStateUser가
+  // userTouched=true로 만들어 원격 적용을 부당하게 차단하는 것을 방지.
   useEffect(() => {
     if (!hydrated) return;
+    if (!syncReady) return;
     const today = todayStr();
     if (state.lastActiveDate === today) return;
 
-    setState((prev) => {
+    setStateUser((prev) => {
       let penalty = 0;
       const newTasks: Task[] = [];
       const logsByDate: Record<string, DayLog> = {};
@@ -548,11 +559,11 @@ export function useGarden() {
         history: newHistory.slice(-60),
       };
     });
-  }, [hydrated, state.lastActiveDate, state.tasks]);
+  }, [hydrated, syncReady, state.lastActiveDate, state.tasks]);
 
   const addTask = useCallback(
     (title: string, time: string, difficulty: Task["difficulty"], kind: TaskKind) => {
-      setState((s) => ({
+      setStateUser((s) => ({
         ...s,
         tasks: [
           ...s.tasks,
@@ -599,7 +610,7 @@ export function useGarden() {
   };
 
   const toggleTask = useCallback((id: string) => {
-    setState((s) => {
+    setStateUser((s) => {
       const task = s.tasks.find((t) => t.id === id);
       if (!task) return s;
       const wasCompleted = task.completed;
@@ -689,11 +700,11 @@ export function useGarden() {
   }, []);
 
   const deleteTask = useCallback((id: string) => {
-    setState((s) => ({ ...s, tasks: s.tasks.filter((t) => t.id !== id) }));
+    setStateUser((s) => ({ ...s, tasks: s.tasks.filter((t) => t.id !== id) }));
   }, []);
 
   const postponeTask = useCallback((id: string) => {
-    setState((s) => ({
+    setStateUser((s) => ({
       ...s,
       tasks: s.tasks.map((t) =>
         t.id === id && t.kind === "flex"
@@ -705,7 +716,7 @@ export function useGarden() {
 
   // 프로젝트 서브태스크 직접 추가
   const addSubTask = useCallback((projectId: string, title: string, difficulty: Task["difficulty"] = "medium", kind: TaskKind = "flex") => {
-    setState((s) => ({
+    setStateUser((s) => ({
       ...s,
       tasks: [
         ...s.tasks,
@@ -728,7 +739,7 @@ export function useGarden() {
 
   // 할일 순서 재정렬
   const reorderTasks = useCallback((orderedIds: string[]) => {
-    setState((s) => {
+    setStateUser((s) => {
       const map = new Map(orderedIds.map((id, i) => [id, i]));
       return {
         ...s,
@@ -739,7 +750,7 @@ export function useGarden() {
 
   // 할일을 프로젝트로 이동 (또는 해제)
   const assignTaskToProject = useCallback((taskId: string, projectId: string | null) => {
-    setState((s) => ({
+    setStateUser((s) => ({
       ...s,
       tasks: s.tasks.map((t) => (t.id === taskId ? { ...t, projectId } : t)),
     }));
@@ -747,7 +758,7 @@ export function useGarden() {
 
   // 할일 날짜 변경
   const moveTaskToDate = useCallback((taskId: string, date: string) => {
-    setState((s) => ({
+    setStateUser((s) => ({
       ...s,
       tasks: s.tasks.map((t) => (t.id === taskId ? { ...t, date } : t)),
     }));
@@ -755,7 +766,7 @@ export function useGarden() {
 
   // 도구 첨부/해제
   const toggleTaskTool = useCallback((taskId: string, toolId: string) => {
-    setState((s) => ({
+    setStateUser((s) => ({
       ...s,
       tasks: s.tasks.map((t) => {
         if (t.id !== taskId) return t;
@@ -769,7 +780,7 @@ export function useGarden() {
   }, []);
 
   const toggleProjectTool = useCallback((projectId: string, toolId: string) => {
-    setState((s) => ({
+    setStateUser((s) => ({
       ...s,
       projects: s.projects.map((p) => {
         if (p.id !== projectId) return p;
@@ -783,16 +794,16 @@ export function useGarden() {
   }, []);
 
   const setNotifications = useCallback((enabled: boolean) => {
-    setState((s) => ({ ...s, notificationsEnabled: enabled }));
+    setStateUser((s) => ({ ...s, notificationsEnabled: enabled }));
   }, []);
 
   const updateSettings = useCallback((patch: Partial<Settings>) => {
-    setState((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
+    setStateUser((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
   }, []);
 
   // ====== Projects ======
   const addProject = useCallback((title: string, description?: string, dueDate?: string, farmId?: string | null) => {
-    setState((s) => ({
+    setStateUser((s) => ({
       ...s,
       projects: [
         ...s.projects,
@@ -811,7 +822,7 @@ export function useGarden() {
   }, []);
 
   const deleteProject = useCallback((id: string) => {
-    setState((s) => ({
+    setStateUser((s) => ({
       ...s,
       projects: s.projects.filter((p) => p.id !== id),
       // 해당 프로젝트의 서브태스크는 해제
@@ -820,14 +831,14 @@ export function useGarden() {
   }, []);
 
   const updateProject = useCallback((id: string, patch: Partial<Pick<Project, "aiUrl" | "title" | "description" | "dueDate">>) => {
-    setState((s) => ({
+    setStateUser((s) => ({
       ...s,
       projects: s.projects.map((p) => (p.id === id ? { ...p, ...patch } : p)),
     }));
   }, []);
 
   const reorderProjects = useCallback((orderedIds: string[]) => {
-    setState((s) => {
+    setStateUser((s) => {
       const map = new Map(orderedIds.map((id, i) => [id, i]));
       return {
         ...s,
@@ -839,7 +850,7 @@ export function useGarden() {
   }, []);
 
   const toggleProject = useCallback((id: string) => {
-    setState((s) => {
+    setStateUser((s) => {
       const project = s.projects.find((p) => p.id === id);
       if (!project) return s;
       const wasCompleted = project.completed;
@@ -888,7 +899,7 @@ export function useGarden() {
 
   // ====== Farms ======
   const addFarm = useCallback((title: string, icon?: string) => {
-    setState((s) => ({
+    setStateUser((s) => ({
       ...s,
       farms: [
         ...s.farms,
@@ -904,7 +915,7 @@ export function useGarden() {
   }, []);
 
   const deleteFarm = useCallback((id: string) => {
-    setState((s) => ({
+    setStateUser((s) => ({
       ...s,
       farms: s.farms.filter((f) => f.id !== id),
       // 해당 농장 나무들은 독립 나무로 전환
@@ -915,14 +926,14 @@ export function useGarden() {
   }, []);
 
   const updateFarm = useCallback((id: string, patch: Partial<Pick<Farm, "title" | "icon" | "aiUrl" | "toolIds">>) => {
-    setState((s) => ({
+    setStateUser((s) => ({
       ...s,
       farms: s.farms.map((f) => (f.id === id ? { ...f, ...patch } : f)),
     }));
   }, []);
 
   const toggleFarmTool = useCallback((farmId: string, toolId: string) => {
-    setState((s) => ({
+    setStateUser((s) => ({
       ...s,
       farms: s.farms.map((f) => {
         if (f.id !== farmId) return f;
@@ -936,7 +947,7 @@ export function useGarden() {
   }, []);
 
   const moveFarm = useCallback((id: string, direction: "up" | "down") => {
-    setState((s) => {
+    setStateUser((s) => {
       const sorted = [...s.farms].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       const idx = sorted.findIndex((f) => f.id === id);
       if (idx === -1) return s;
@@ -960,7 +971,7 @@ export function useGarden() {
 
   // 나무(프로젝트)를 농장으로 이동하거나 독립 나무로 전환
   const moveProjectToFarm = useCallback((projectId: string, farmId: string | null) => {
-    setState((s) => ({
+    setStateUser((s) => ({
       ...s,
       projects: s.projects.map((p) =>
         p.id === projectId ? { ...p, farmId } : p,
@@ -971,7 +982,7 @@ export function useGarden() {
   // ====== Local Tools CRUD ======
   const addLocalTool = useCallback(
     (tool: Omit<Tool, "id" | "tags"> & { tags?: string[] }) => {
-      setState((s) => ({
+      setStateUser((s) => ({
         ...s,
         localTools: [
           ...s.localTools,
@@ -987,14 +998,14 @@ export function useGarden() {
   );
 
   const updateLocalTool = useCallback((id: string, patch: Partial<Omit<Tool, "id">>) => {
-    setState((s) => ({
+    setStateUser((s) => ({
       ...s,
       localTools: s.localTools.map((t) => (t.id === id ? { ...t, ...patch } : t)),
     }));
   }, []);
 
   const deleteLocalTool = useCallback((id: string) => {
-    setState((s) => ({
+    setStateUser((s) => ({
       ...s,
       localTools: s.localTools.filter((t) => t.id !== id),
       // 연결된 할일/프로젝트에서도 제거
@@ -1007,7 +1018,7 @@ export function useGarden() {
   }, []);
 
   const setCondition = useCallback((mode: ConditionMode) => {
-    setState((s) => ({
+    setStateUser((s) => ({
       ...s,
       condition: mode,
       conditionSetAt: conditionStampFor(s.settings.morningTime),
@@ -1016,7 +1027,7 @@ export function useGarden() {
 
   const setPledge = useCallback((text: string) => {
     const today = todayStr();
-    setState((s) => {
+    setStateUser((s) => {
       const existing = s.pledges.findIndex((p) => p.date === today);
       const pledges =
         existing >= 0
@@ -1026,7 +1037,7 @@ export function useGarden() {
     });
   }, []);
 
-  // 수동 저장
+  // 수동 저장. inFlightSave 체인으로 debounced save와 함께 직렬화.
   const saveNow = useCallback(async () => {
     if (!hydrated) return;
     if (!syncReady) return;
@@ -1035,18 +1046,23 @@ export function useGarden() {
     const scriptUrl = getScriptUrl();
     const adapter = scriptUrl ? createSheetsAdapter(scriptUrl) : createLocalAdapter();
 
-    setSaveStatus("saving");
-    try {
-      await adapter.save(state);
-      setSaveStatus("saved");
-      if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
-      savedResetTimer.current = setTimeout(() => setSaveStatus("idle"), 2000);
-    } catch {
-      await createLocalAdapter().save(state);
-      setSaveStatus("error");
-      if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
-      savedResetTimer.current = setTimeout(() => setSaveStatus("idle"), 3000);
-    }
+    const previous = inFlightSave.current;
+    inFlightSave.current = (async () => {
+      await previous.catch(() => {});
+      setSaveStatus("saving");
+      try {
+        await adapter.save(state);
+        setSaveStatus("saved");
+        if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
+        savedResetTimer.current = setTimeout(() => setSaveStatus("idle"), 2000);
+      } catch {
+        await createLocalAdapter().save(state);
+        setSaveStatus("error");
+        if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
+        savedResetTimer.current = setTimeout(() => setSaveStatus("idle"), 3000);
+      }
+    })();
+    await inFlightSave.current;
   }, [state, hydrated, syncReady]);
 
   // 컨디션은 morningTime 기준 하루 단위로 reset. 새 day-window의 첫 접속 시 picker.

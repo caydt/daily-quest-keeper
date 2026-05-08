@@ -261,6 +261,69 @@ describe("hydrate/save race", () => {
     expect(ids).toContain("remote-x");
     expect(ids).not.toContain("local-a");
   });
+
+  it("[userTouched-race] mutator 호출과 같은 batch에서 GET이 도착해도 사용자 입력이 우선", async () => {
+    // RED before fix: 사용자 mutator 호출 → setState 큐잉 → watcher useEffect는 다음 effect flush에서야 실행.
+    // 그 사이 in-flight GET이 resolve되면 hydrate continuation이 userTouched=false를 보고 applyState 통과 → 입력 clobber.
+    // GREEN after fix: setStateUser 헬퍼가 setState 직전에 동기적으로 userTouched=true 설정 → applyState 스킵.
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ farms: [farm("local-a", 0, "로컬")] }),
+    );
+    const { result } = renderHook(() => useGarden());
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    // 같은 act 안에서: mutator 호출 → 그 직후 GET resolve → microtask drain
+    await act(async () => {
+      result.current.addFarm("user-farm");
+      fetchCtrl.resolveGet({
+        farms: [farm("remote-x", 0, "원격")],
+        projects: [],
+        tasks: [],
+      });
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    await waitFor(() => expect(result.current.syncReady).toBe(true));
+
+    const titles = result.current.state.farms.map((f) => f.title);
+    expect(titles).toContain("user-farm");
+    expect(titles).not.toContain("원격");
+  });
+
+  it("[save-order] 빠르게 두 번 saveNow 호출되어도 POST는 직렬화됨 (동시 in-flight 1개 이하)", async () => {
+    // RED before fix: 첫 POST 진행 중 두 번째 POST가 동시에 발사됨 → 도착 순서 역전 시 silent data loss.
+    // GREEN after fix: inFlight promise chain으로 직렬화 → 동시 in-flight POST는 항상 1개 이하.
+    let inFlight = 0;
+    let maxConcurrent = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const method = init?.method ?? "GET";
+      if (method === "POST") {
+        inFlight++;
+        maxConcurrent = Math.max(maxConcurrent, inFlight);
+        await new Promise((r) => setTimeout(r, 30));
+        inFlight--;
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ ok: true, data: {} }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+
+    const { result } = renderHook(() => useGarden());
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+    await waitFor(() => expect(result.current.syncReady).toBe(true));
+
+    await act(async () => {
+      const p1 = result.current.saveNow();
+      const p2 = result.current.saveNow();
+      await Promise.all([p1, p2]);
+    });
+
+    expect(maxConcurrent).toBeLessThanOrEqual(1);
+  });
 });
 
 describe("farmStage tier", () => {
