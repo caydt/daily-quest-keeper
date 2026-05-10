@@ -62,11 +62,11 @@ function MapPage() {
         <p className="text-xs text-muted-foreground">{farms.length}개 농장</p>
       </div>
 
-      {/* 맵 캔버스 */}
-      <div className="p-8 md:p-12">
+      {/* 맵 캔버스 — 모바일에서 패딩 줄이고 농장 타일 minmax 낮춰서 좁은 화면에서도 overflow 안 나게 */}
+      <div className="p-4 sm:p-8 md:p-12">
         <div
-          className="grid gap-8"
-          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}
+          className="grid gap-6 sm:gap-8"
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))" }}
         >
           {farms.map((farm, idx) => {
             const trees = state.projects
