@@ -158,23 +158,25 @@ function ProjectCard({
           </button>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={`font-bold ${p.completed ? "line-through text-muted-foreground" : ""}`}>
-                {p.title}
-              </span>
-              {p.dueDate && (
-                <span className="text-[10px] text-muted-foreground inline-flex items-center gap-1">
-                  <CalendarDays className="size-3" /> {p.dueDate}
-                </span>
-              )}
-              {/* 소속 농장 뱃지 */}
-              {p.farmId && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  {farms.find(f => f.id === p.farmId)?.icon ?? "🌾"}{" "}
-                  {farms.find(f => f.id === p.farmId)?.title ?? "농장"}
-                </span>
-              )}
+            {/* 제목은 항상 한 줄(혹은 자연 줄바꿈) 차지하고, 메타 뱃지는 아래 행으로 분리해서 좁은 화면에서 제목이 squeeze되지 않게 */}
+            <div className={`font-bold ${p.completed ? "line-through text-muted-foreground" : ""}`}>
+              {p.title}
             </div>
+            {(p.dueDate || p.farmId) && (
+              <div className="flex items-center gap-2 flex-wrap mt-1">
+                {p.dueDate && (
+                  <span className="text-[10px] text-muted-foreground inline-flex items-center gap-1">
+                    <CalendarDays className="size-3" /> {p.dueDate}
+                  </span>
+                )}
+                {p.farmId && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    {farms.find(f => f.id === p.farmId)?.icon ?? "🌾"}{" "}
+                    {farms.find(f => f.id === p.farmId)?.title ?? "농장"}
+                  </span>
+                )}
+              </div>
+            )}
 
             {p.description && (
               <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{p.description}</p>
