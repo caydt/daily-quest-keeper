@@ -134,11 +134,14 @@
     font-family: var(--font-sans);
     /*
      * 한글 줄바꿈: 기본(word-break: normal)은 CJK 사이 임의 위치에서 끊겨서
-     * 좁은 컨테이너에서 "한 / 글 / 자 / 씩" 줄바꿈이 발생함. keep-all로 어절(공백) 단위로만 끊고,
-     * overflow-wrap: anywhere로 정말 못 들어갈 때만 강제 줄바꿈해서 overflow 방지.
+     * 좁은 컨테이너에서 "한 / 글 / 자 / 씩" 줄바꿈이 발생함. keep-all로 어절(공백) 단위로만 끊음.
+     *
+     * 주의: overflow-wrap: anywhere는 flex 아이템의 min-content를 1-char로 만들어
+     * 좁은 화면에서 제목이 squeeze될 때 한 글자씩 줄바꿈되는 부작용이 있음. 사용 금지.
+     * 정말 못 들어가는 긴 단어가 있으면 해당 요소에 개별적으로 break-word 적용.
      */
     word-break: keep-all;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
   }
 
   .font-display {
