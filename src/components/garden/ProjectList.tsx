@@ -245,8 +245,11 @@ function ProjectCard({
               </button>
             )}
           </div>
-          {/* 나머지 액션 버튼들 (hover 시) */}
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        </div>
+
+        {/* 나머지 액션 버튼들. 모바일: 카드 아래쪽에 wrap 행으로 항상 표시. 데스크탑: 우측 상단 hover 오버레이.
+            (예전엔 같은 row에 opacity-0으로 두어 layout 공간을 먹어 모바일에서 제목이 squeeze되는 버그가 있었음) */}
+        <div className="mt-3 flex flex-wrap items-center gap-1 md:mt-0 md:absolute md:top-3 md:right-3 md:opacity-0 md:group-hover:opacity-100 md:transition-opacity">
             {/* AI 채팅 버튼 */}
             {(settings.aiChatEnabled ?? true) && (
               <button
@@ -345,7 +348,6 @@ function ProjectCard({
             >
               <Trash2 className="size-3.5" />
             </button>
-          </div>
         </div>
 
         {/* AI URL 인라인 입력 */}
