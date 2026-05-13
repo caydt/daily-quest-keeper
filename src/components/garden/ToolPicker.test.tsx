@@ -94,4 +94,34 @@ describe("ToolPicker", () => {
     fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("ESC 키 → onClose 호출 (모달 회귀 방지)", () => {
+    const onClose = vi.fn();
+    render(
+      <ToolPicker
+        availableTools={tools}
+        selectedIds={[]}
+        onToggle={vi.fn()}
+        onClose={onClose}
+      />,
+    );
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("X 아이콘(헤더) → onClose 호출", () => {
+    const onClose = vi.fn();
+    render(
+      <ToolPicker
+        availableTools={tools}
+        selectedIds={[]}
+        onToggle={vi.fn()}
+        onClose={onClose}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "도구 선택 창 닫기" }));
+    expect(onClose).toHaveBeenCalled();
+  });
 });
