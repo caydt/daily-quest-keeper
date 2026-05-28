@@ -455,6 +455,164 @@ describe("splitMultilinePaste", () => {
   });
 });
 
+describe("pendingMigration / resolveMigration (마이그레이션 선택 흐름)", () => {
+  const localData = {
+    xp: 0,
+    totalXp: 0,
+    streak: 0,
+    combo: 0,
+    lastActiveDate: null,
+    tasks: [
+      {
+        id: "local-task-1",
+        title: "로컬 할일",
+        time: "09:00",
+        difficulty: "easy" as const,
+        kind: "flex" as const,
+        completed: false,
+        createdAt: 1000,
+        date: "2026-05-28",
+        postponedCount: 0,
+        order: 0,
+      },
+    ],
+    projects: [],
+    farms: [],
+    notificationsEnabled: false,
+    settings: { morningTime: "08:00", eveningTime: "21:00" },
+    history: [],
+    achievements: {},
+    condition: null,
+    conditionSetAt: null,
+    localTools: [],
+    pledges: [],
+  };
+
+  const remoteData = {
+    ...localData,
+    tasks: [
+      {
+        id: "remote-task-1",
+        title: "원격 할일 A",
+        time: "10:00",
+        difficulty: "hard" as const,
+        kind: "must" as const,
+        completed: false,
+        createdAt: 2000,
+        date: "2026-05-28",
+        postponedCount: 0,
+        order: 0,
+      },
+      {
+        id: "remote-task-2",
+        title: "원격 할일 B",
+        time: "11:00",
+        difficulty: "medium" as const,
+        kind: "flex" as const,
+        completed: false,
+        createdAt: 2001,
+        date: "2026-05-28",
+        postponedCount: 0,
+        order: 1,
+      },
+    ],
+  };
+
+  // vi.doMock + vi.resetModules 패턴으로 각 테스트마다 완전히 새로운 모듈 인스턴스 사용
+  const setupMigrationMocks = () => {
+    const ctrl = { resolveLoad: (_data: unknown) => {} };
+
+    vi.doMock("@/lib/supabase-client", () => ({
+      supabase: {
+        auth: {
+          getSession: async () => ({
+            data: { session: { user: { id: "test-user-id" } } },
+          }),
+        },
+      },
+    }));
+    vi.doMock("@/lib/supabase-adapter", () => ({
+      createSupabaseAdapter: (_userId: string) => ({
+        load: () =>
+          new Promise<unknown>((resolve) => {
+            ctrl.resolveLoad = resolve;
+          }),
+        save: async () => {},
+      }),
+    }));
+
+    return ctrl;
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.doUnmock("@/lib/supabase-client");
+    vi.doUnmock("@/lib/supabase-adapter");
+  });
+
+  it("시나리오 A: 로컬+원격 둘 다 있으면 pendingMigration 설정, syncReady=false 유지", async () => {
+    // localStorage 시드
+    localStorage.setItem("lumi-garden-v3", JSON.stringify(localData));
+
+    const ctrl = setupMigrationMocks();
+
+    // vi.resetModules 이후 동적 import로 새 모듈 인스턴스 사용
+    const { useGarden: useGardenFresh } = await import("./garden-store");
+
+    const { result } = renderHook(() => useGardenFresh());
+
+    // hydrate 대기
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    // 원격 데이터 반환 (load Promise resolve)
+    await act(async () => {
+      ctrl.resolveLoad(remoteData);
+    });
+
+    // pendingMigration이 설정돼야 함
+    await waitFor(() => expect(result.current.pendingMigration).not.toBeNull());
+
+    // syncReady는 false여야 함 (마이그레이션 선택 전 자동 save 방지)
+    expect(result.current.syncReady).toBe(false);
+  });
+
+  it("시나리오 B: resolveMigration('local') 호출 시 state가 로컬 데이터로 설정, pendingMigration null", async () => {
+    // localStorage 시드
+    localStorage.setItem("lumi-garden-v3", JSON.stringify(localData));
+
+    const ctrl = setupMigrationMocks();
+
+    const { useGarden: useGardenFresh } = await import("./garden-store");
+
+    const { result } = renderHook(() => useGardenFresh());
+
+    await waitFor(() => expect(result.current.hydrated).toBe(true));
+
+    await act(async () => {
+      ctrl.resolveLoad(remoteData);
+    });
+
+    await waitFor(() => expect(result.current.pendingMigration).not.toBeNull());
+
+    // resolveMigration("local") 호출
+    await act(async () => {
+      await result.current.resolveMigration("local");
+    });
+
+    // pendingMigration이 null이 됐는지 확인
+    expect(result.current.pendingMigration).toBeNull();
+
+    // state가 로컬 데이터 기준으로 설정됐는지 확인 (로컬 tasks 수 = 1)
+    expect(result.current.state.tasks).toHaveLength(1);
+    expect(result.current.state.tasks[0].id).toBe("local-task-1");
+  });
+});
+
 describe("[P2-C 회귀 방지] deleteLocalTool은 farms.toolIds에서도 제거", () => {
   beforeEach(() => {
     localStorage.clear();

@@ -409,6 +409,8 @@ export function useGarden() {
         // ④ 로컬 + 원격 둘 다 있으면 마이그레이션 선택 대기
         if (local && !migrationDone.current) {
           if (!cancelled) setPendingMigration({ local, remote });
+          // syncReady를 false로 유지 — 마이그레이션 선택 전 자동 save 방지.
+          // resolveMigration 호출 시 setSyncReady(true)됨. 탭을 닫으면 다음 hydrate에서 다시 선택.
           return;
         }
 
@@ -1092,6 +1094,7 @@ export function useGarden() {
         await adapter.save(pendingMigration.local).catch(() => {});
       }
 
+      // setStateUser 대신 setState: isApplyingRemote=true로 save 레이스 방지 (applyState와 동일 패턴)
       isApplyingRemote.current = true;
       setState(mergeState(chosen));
       requestAnimationFrame(() => {
