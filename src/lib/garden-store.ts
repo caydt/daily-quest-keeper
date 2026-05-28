@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { Tool } from "@/lib/tools-sheet";
 import { createLocalAdapter } from "@/lib/storage";
-import { getScriptUrl, createSheetsAdapter } from "@/lib/sheets-adapter";
+import { supabase } from "@/lib/supabase-client";
+import { createSupabaseAdapter } from "@/lib/supabase-adapter";
 
 export type TaskKind = "must" | "flex"; // must = 당일 필수(벌점), flex = 연기 가능(벌점 없음)
 
@@ -326,6 +327,11 @@ export function useGarden() {
   const [hydrated, setHydrated] = useState(false);
   const [syncReady, setSyncReady] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [pendingMigration, setPendingMigration] = useState<{
+    local: GardenState;
+    remote: GardenState;
+  } | null>(null);
+  const migrationDone = useRef(false);
   const isApplyingRemote = useRef(false);
   const userTouched = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -341,7 +347,7 @@ export function useGarden() {
     setState(updater);
   }, []);
 
-  // 로드: 로컬 먼저 즉시 렌더 → Apps Script 백그라운드 갱신
+  // hydrate: 로컬 즉시 렌더 → Supabase 로그인 시 원격 동기화
   useEffect(() => {
     let cancelled = false;
 
@@ -360,68 +366,75 @@ export function useGarden() {
     const applyState = (next: GardenState) => {
       isApplyingRemote.current = true;
       setState(next);
-      requestAnimationFrame(() => { isApplyingRemote.current = false; });
+      requestAnimationFrame(() => {
+        isApplyingRemote.current = false;
+      });
     };
 
     const run = async () => {
-      // ① 로컬 데이터 즉시 로드 → 빈 화면 없이 바로 렌더
+      // ① 로컬 즉시 렌더
       const local = await createLocalAdapter().load();
       if (cancelled) return;
       if (local) {
-        // mergeState와 동일한 settings 계산을 먼저 수행 → migrate boundary와 todayCondition 평가 boundary 일치 보장.
         const mergedSettings = { ...initial.settings, ...(local.settings || {}) };
         migrateLegacyCondition(local, mergedSettings.morningTime);
       }
       applyState(local ? mergeState(local) : initial);
       setHydrated(true);
 
-      // ② Apps Script URL 있으면 백그라운드에서 원격 데이터 가져와 갱신
-      const scriptUrl = getScriptUrl();
-      if (!scriptUrl) {
+      // ② auth 확인
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
         if (!cancelled) setSyncReady(true);
         return;
       }
 
+      // ③ Supabase 원격 로드
       try {
-        const remote = await createSheetsAdapter(scriptUrl).load();
+        const adapter = createSupabaseAdapter(session.user.id);
+        const remote = await adapter.load();
         if (cancelled) return;
 
-        if (!remote || Object.keys(remote).length === 0) {
-          // 시트가 비어있으면 로컬 데이터를 업로드해 초기화
-          if (local) await createSheetsAdapter(scriptUrl).save(local).catch(() => {});
+        if (!remote) {
+          if (local) await adapter.save(local).catch(() => {});
+          if (!cancelled) setSyncReady(true);
           return;
         }
 
-        // 사용자가 hydrate 후 입력/액션을 했으면 원격 적용 스킵.
-        // 이후 save effect가 local→remote 동기화 처리. 다음 새로고침/focus 시 sync.
-        if (userTouched.current) return;
-
-        // 원격 데이터가 있으면 갱신 (로컬보다 우선).
-        // mergeState와 동일한 settings 계산 후 morningTime 추출 → migrate/평가 boundary 일치 보장.
         const mergedSettings = { ...initial.settings, ...(remote.settings || {}) };
         migrateLegacyCondition(remote, mergedSettings.morningTime);
-        applyState(mergeState(remote));
+
+        // ④ 로컬 + 원격 둘 다 있으면 마이그레이션 선택 대기
+        if (local && !migrationDone.current) {
+          if (!cancelled) setPendingMigration({ local, remote });
+          return;
+        }
+
+        if (!userTouched.current) {
+          applyState(mergeState(remote));
+        }
+        if (!cancelled) setSyncReady(true);
       } catch {
-        // Apps Script 실패 → 이미 로컬 데이터가 표시된 상태이므로 그대로 유지
-      } finally {
         if (!cancelled) setSyncReady(true);
       }
     };
 
     run();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // userTouched는 setStateUser 헬퍼에서 동기 flip. (워처 useEffect는 race 때문에 제거됨)
 
-  // 저장: StorageAdapter 기반 debounce 저장. inFlightSave 체인으로 직렬화.
+  // 저장: 로그인 시 Supabase, 비로그인 시 localStorage
   useEffect(() => {
     if (!hydrated) return;
     if (!syncReady) return;
     if (isApplyingRemote.current) return;
-
-    const scriptUrl = getScriptUrl();
-    const adapter = scriptUrl ? createSheetsAdapter(scriptUrl) : createLocalAdapter();
 
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
@@ -430,7 +443,14 @@ export function useGarden() {
         await previous.catch(() => {});
         setSaveStatus("saving");
         try {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          const adapter = session
+            ? createSupabaseAdapter(session.user.id)
+            : createLocalAdapter();
           await adapter.save(state);
+          if (session) await createLocalAdapter().save(state).catch(() => {});
           setSaveStatus("saved");
           if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
           savedResetTimer.current = setTimeout(() => setSaveStatus("idle"), 2000);
@@ -448,23 +468,23 @@ export function useGarden() {
     };
   }, [state, hydrated, syncReady]);
 
-  // 윈도우 포커스 시 원격 데이터 리패치
+  // 포커스 시 Supabase 원격 리패치
   useEffect(() => {
     const onFocus = async () => {
-      const scriptUrl = getScriptUrl();
-      if (!scriptUrl) return;
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) return;
       try {
-        const remote = await createSheetsAdapter(scriptUrl).load();
+        const remote = await createSupabaseAdapter(session.user.id).load();
         if (!remote) return;
-        // 한 세션 안에서는 사용자 입력 보존 우선. focus-refetch도 스킵.
-        // 다음 새로고침 시 hydrate 경로로 sync됨.
         if (userTouched.current) return;
         isApplyingRemote.current = true;
         setState((prev) => {
-          // 실제 머지될 settings를 먼저 계산해서 migrate에 같은 morningTime을 전달.
-          // remote.settings가 partial(예: {})이면 spread는 initial.settings.morningTime을 그대로 둠.
-          // remote.settings가 null/undefined면 prev.settings 사용.
-          const mergedSettings = { ...initial.settings, ...(remote.settings || prev.settings) };
+          const mergedSettings = {
+            ...initial.settings,
+            ...(remote.settings || prev.settings),
+          };
           migrateLegacyCondition(remote, mergedSettings.morningTime);
           return {
             ...initial,
@@ -478,9 +498,11 @@ export function useGarden() {
             pledges: remote.pledges || [],
           };
         });
-        requestAnimationFrame(() => { isApplyingRemote.current = false; });
+        requestAnimationFrame(() => {
+          isApplyingRemote.current = false;
+        });
       } catch {
-        /* 무시 */
+        /* 포커스 리패치 실패 무시 */
       }
     };
 
@@ -1041,21 +1063,66 @@ export function useGarden() {
     });
   }, []);
 
+  const resolveMigration = useCallback(
+    async (choice: "local" | "remote") => {
+      if (!pendingMigration) return;
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const adapter = createSupabaseAdapter(session.user.id);
+
+      const mergeState = (data: Partial<GardenState>): GardenState => ({
+        ...initial,
+        ...data,
+        settings: { ...initial.settings, ...(data.settings || {}) },
+        history: (data as GardenState).history || [],
+        projects: (data as GardenState).projects || [],
+        farms: (data as GardenState).farms || [],
+        achievements: (data as GardenState).achievements || {},
+        localTools: (data as GardenState).localTools || [],
+        pledges: (data as GardenState).pledges || [],
+      });
+
+      const chosen =
+        choice === "local" ? pendingMigration.local : pendingMigration.remote;
+
+      if (choice === "local") {
+        await adapter.save(pendingMigration.local).catch(() => {});
+      }
+
+      isApplyingRemote.current = true;
+      setState(mergeState(chosen));
+      requestAnimationFrame(() => {
+        isApplyingRemote.current = false;
+      });
+      migrationDone.current = true;
+      setPendingMigration(null);
+      setSyncReady(true);
+    },
+    [pendingMigration],
+  );
+
   // 수동 저장. inFlightSave 체인으로 debounced save와 함께 직렬화.
   const saveNow = useCallback(async () => {
     if (!hydrated) return;
     if (!syncReady) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
 
-    const scriptUrl = getScriptUrl();
-    const adapter = scriptUrl ? createSheetsAdapter(scriptUrl) : createLocalAdapter();
-
     const previous = inFlightSave.current;
     inFlightSave.current = (async () => {
       await previous.catch(() => {});
       setSaveStatus("saving");
       try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const adapter = session
+          ? createSupabaseAdapter(session.user.id)
+          : createLocalAdapter();
         await adapter.save(state);
+        if (session) await createLocalAdapter().save(state).catch(() => {});
         setSaveStatus("saved");
         if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
         savedResetTimer.current = setTimeout(() => setSaveStatus("idle"), 2000);
@@ -1081,6 +1148,8 @@ export function useGarden() {
     hydrated,
     syncReady,
     saveStatus,
+    pendingMigration,
+    resolveMigration,
     saveNow,
     todayCondition,
     addTask,
