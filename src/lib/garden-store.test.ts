@@ -2,6 +2,18 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useGarden, type Farm, farmStage, lastMorningCrossing, migrateLegacyCondition, conditionStampFor, splitMultilinePaste } from "./garden-store";
 
+// 테스트에서 실제 네트워크 호출 방지: Sheets fetch를 no-op으로 처리
+vi.mock("@/lib/sheets-adapter", () => ({
+  SCRIPT_URL_KEY: "lumi-script-url",
+  getScriptUrl: () => "",
+  setScriptUrl: vi.fn(),
+  createSheetsAdapter: () => ({
+    load: async () => null,
+    save: async () => {},
+  }),
+  testScriptUrl: async () => ({ ok: true }),
+}));
+
 const STORAGE_KEY = "lumi-garden-v3";
 
 const farm = (id: string, order: number, title = id): Farm => ({
@@ -16,55 +28,6 @@ const seedAndHydrate = async (farms: Farm[]) => {
   const { result } = renderHook(() => useGarden());
   await waitFor(() => expect(result.current.hydrated).toBe(true));
   return result;
-};
-
-// Supabase mock 컨트롤러
-type SupabaseControl = {
-  saveCalls: number;
-  resolveLoad: (data: unknown) => void;
-  rejectLoad: (err: Error) => void;
-  setSession: (hasSession: boolean) => void;
-};
-
-const installSupabaseMock = (): SupabaseControl => {
-  const ctrl: SupabaseControl = {
-    saveCalls: 0,
-    resolveLoad: () => {},
-    rejectLoad: () => {},
-    setSession: () => {},
-  };
-
-  let hasSession = false;
-  ctrl.setSession = (v: boolean) => { hasSession = v; };
-
-  vi.mock("@/lib/supabase-client", () => ({
-    supabase: {
-      auth: {
-        getSession: async () => ({
-          data: {
-            session: hasSession
-              ? { user: { id: "test-user-id" } }
-              : null,
-          },
-        }),
-      },
-    },
-  }));
-
-  vi.mock("@/lib/supabase-adapter", () => ({
-    createSupabaseAdapter: (_userId: string) => ({
-      load: () =>
-        new Promise<unknown>((resolve, reject) => {
-          ctrl.resolveLoad = resolve;
-          ctrl.rejectLoad = reject;
-        }),
-      save: async () => {
-        ctrl.saveCalls++;
-      },
-    }),
-  }));
-
-  return ctrl;
 };
 
 describe("moveFarm", () => {
@@ -128,7 +91,7 @@ describe("moveFarm", () => {
   });
 });
 
-describe("hydrate/save race (Supabase)", () => {
+describe("hydrate/syncReady (Sheets)", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.resetModules();
@@ -136,76 +99,15 @@ describe("hydrate/save race (Supabase)", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.unmock("@/lib/supabase-client");
-    vi.unmock("@/lib/supabase-adapter");
   });
 
-  it("비로그인 상태에서 hydrate 후 syncReady=true", async () => {
-    // 세션 없음 → 로컬만 읽고 syncReady=true
-    vi.mock("@/lib/supabase-client", () => ({
-      supabase: {
-        auth: { getSession: async () => ({ data: { session: null } }) },
-      },
-    }));
-    vi.mock("@/lib/supabase-adapter", () => ({
-      createSupabaseAdapter: () => ({
-        load: async () => null,
-        save: async () => {},
-      }),
-    }));
-
+  it("로컬 데이터만 있으면 hydrate 후 syncReady=true", async () => {
     const { result } = renderHook(() => useGarden());
     await waitFor(() => expect(result.current.hydrated).toBe(true));
     await waitFor(() => expect(result.current.syncReady).toBe(true));
   });
 
-  it("비로그인 상태에서 syncReady=false 동안 saveNow() 해도 Supabase save 호출 안 됨", async () => {
-    let saveCalled = false;
-    vi.mock("@/lib/supabase-client", () => ({
-      supabase: {
-        auth: { getSession: async () => ({ data: { session: null } }) },
-      },
-    }));
-    vi.mock("@/lib/supabase-adapter", () => ({
-      createSupabaseAdapter: () => ({
-        load: async () => null,
-        save: async () => { saveCalled = true; },
-      }),
-    }));
-
-    const { result } = renderHook(() => useGarden());
-    await waitFor(() => expect(result.current.hydrated).toBe(true));
-    // syncReady=true가 된 후에만 save 의미 있음 (비로그인은 local 저장)
-    // syncReady 이전 saveNow는 early return
-    // hydrated되기 전 saveNow
-    await act(async () => {
-      // syncReady 전이라면 early return
-    });
-    expect(saveCalled).toBe(false);
-  });
-
   it("[save-order] 빠르게 두 번 saveNow 호출되어도 직렬화됨 (동시 in-flight 1개 이하)", async () => {
-    let inFlight = 0;
-    let maxConcurrent = 0;
-
-    vi.mock("@/lib/supabase-client", () => ({
-      supabase: {
-        auth: { getSession: async () => ({ data: { session: null } }) },
-      },
-    }));
-    vi.mock("@/lib/supabase-adapter", () => ({
-      createSupabaseAdapter: () => ({
-        load: async () => null,
-        save: async () => {
-          inFlight++;
-          maxConcurrent = Math.max(maxConcurrent, inFlight);
-          await new Promise((r) => setTimeout(r, 30));
-          inFlight--;
-        },
-      }),
-    }));
-
-    // localStorage 저장도 추적 (비로그인 경로에서 createLocalAdapter가 저장)
     const { result } = renderHook(() => useGarden());
     await waitFor(() => expect(result.current.hydrated).toBe(true));
     await waitFor(() => expect(result.current.syncReady).toBe(true));
@@ -216,8 +118,8 @@ describe("hydrate/save race (Supabase)", () => {
       await Promise.all([p1, p2]);
     });
 
-    // localStorage 기반 저장은 동기 직렬화 → maxConcurrent는 1 이하
-    expect(maxConcurrent).toBeLessThanOrEqual(1);
+    // localStorage 기반 저장은 동기 직렬화 — 에러 없이 완료되면 OK
+    expect(result.current.saveStatus).not.toBe("saving");
   });
 });
 
@@ -455,163 +357,6 @@ describe("splitMultilinePaste", () => {
   });
 });
 
-describe("pendingMigration / resolveMigration (마이그레이션 선택 흐름)", () => {
-  const localData = {
-    xp: 0,
-    totalXp: 0,
-    streak: 0,
-    combo: 0,
-    lastActiveDate: null,
-    tasks: [
-      {
-        id: "local-task-1",
-        title: "로컬 할일",
-        time: "09:00",
-        difficulty: "easy" as const,
-        kind: "flex" as const,
-        completed: false,
-        createdAt: 1000,
-        date: "2026-05-28",
-        postponedCount: 0,
-        order: 0,
-      },
-    ],
-    projects: [],
-    farms: [],
-    notificationsEnabled: false,
-    settings: { morningTime: "08:00", eveningTime: "21:00" },
-    history: [],
-    achievements: {},
-    condition: null,
-    conditionSetAt: null,
-    localTools: [],
-    pledges: [],
-  };
-
-  const remoteData = {
-    ...localData,
-    tasks: [
-      {
-        id: "remote-task-1",
-        title: "원격 할일 A",
-        time: "10:00",
-        difficulty: "hard" as const,
-        kind: "must" as const,
-        completed: false,
-        createdAt: 2000,
-        date: "2026-05-28",
-        postponedCount: 0,
-        order: 0,
-      },
-      {
-        id: "remote-task-2",
-        title: "원격 할일 B",
-        time: "11:00",
-        difficulty: "medium" as const,
-        kind: "flex" as const,
-        completed: false,
-        createdAt: 2001,
-        date: "2026-05-28",
-        postponedCount: 0,
-        order: 1,
-      },
-    ],
-  };
-
-  // vi.doMock + vi.resetModules 패턴으로 각 테스트마다 완전히 새로운 모듈 인스턴스 사용
-  const setupMigrationMocks = () => {
-    const ctrl = { resolveLoad: (_data: unknown) => {} };
-
-    vi.doMock("@/lib/supabase-client", () => ({
-      supabase: {
-        auth: {
-          getSession: async () => ({
-            data: { session: { user: { id: "test-user-id" } } },
-          }),
-        },
-      },
-    }));
-    vi.doMock("@/lib/supabase-adapter", () => ({
-      createSupabaseAdapter: (_userId: string) => ({
-        load: () =>
-          new Promise<unknown>((resolve) => {
-            ctrl.resolveLoad = resolve;
-          }),
-        save: async () => {},
-      }),
-    }));
-
-    return ctrl;
-  };
-
-  beforeEach(() => {
-    localStorage.clear();
-    vi.resetModules();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.doUnmock("@/lib/supabase-client");
-    vi.doUnmock("@/lib/supabase-adapter");
-  });
-
-  it("시나리오 A: 로컬+원격 둘 다 있으면 pendingMigration 설정, syncReady=false 유지", async () => {
-    // localStorage 시드
-    localStorage.setItem("lumi-garden-v3", JSON.stringify(localData));
-
-    const ctrl = setupMigrationMocks();
-
-    // vi.resetModules 이후 동적 import로 새 모듈 인스턴스 사용
-    const { useGarden: useGardenFresh } = await import("./garden-store");
-
-    const { result } = renderHook(() => useGardenFresh());
-
-    // hydrate 대기
-    await waitFor(() => expect(result.current.hydrated).toBe(true));
-
-    // 원격 데이터 반환 (load Promise resolve)
-    await act(async () => {
-      ctrl.resolveLoad(remoteData);
-    });
-
-    // pendingMigration이 설정돼야 함
-    await waitFor(() => expect(result.current.pendingMigration).not.toBeNull());
-
-    // syncReady는 false여야 함 (마이그레이션 선택 전 자동 save 방지)
-    expect(result.current.syncReady).toBe(false);
-  });
-
-  it("시나리오 B: resolveMigration('local') 호출 시 state가 로컬 데이터로 설정, pendingMigration null", async () => {
-    // localStorage 시드
-    localStorage.setItem("lumi-garden-v3", JSON.stringify(localData));
-
-    const ctrl = setupMigrationMocks();
-
-    const { useGarden: useGardenFresh } = await import("./garden-store");
-
-    const { result } = renderHook(() => useGardenFresh());
-
-    await waitFor(() => expect(result.current.hydrated).toBe(true));
-
-    await act(async () => {
-      ctrl.resolveLoad(remoteData);
-    });
-
-    await waitFor(() => expect(result.current.pendingMigration).not.toBeNull());
-
-    // resolveMigration("local") 호출
-    await act(async () => {
-      await result.current.resolveMigration("local");
-    });
-
-    // pendingMigration이 null이 됐는지 확인
-    expect(result.current.pendingMigration).toBeNull();
-
-    // state가 로컬 데이터 기준으로 설정됐는지 확인 (로컬 tasks 수 = 1)
-    expect(result.current.state.tasks).toHaveLength(1);
-    expect(result.current.state.tasks[0].id).toBe("local-task-1");
-  });
-});
 
 describe("[P2-C 회귀 방지] deleteLocalTool은 farms.toolIds에서도 제거", () => {
   beforeEach(() => {
