@@ -15,12 +15,14 @@ import {
   X,
   ChevronDown,
   ChevronRight,
-  ChevronUp,
+  ChevronLeft,
   Pencil,
   MoveRight,
   ExternalLink,
   Link2,
+  LayoutGrid,
 } from "lucide-react";
+import { MandalartOverlay } from "./MandalartOverlay";
 import { ToolChipBar } from "@/components/garden/ToolChipBar";
 import { ToolPicker } from "@/components/garden/ToolPicker";
 import { AiChatPanel } from "@/components/garden/AiChatPanel";
@@ -527,6 +529,7 @@ export function FarmCard({
   const [showAiChat, setShowAiChat] = useState(false);
   const [showInlineAdd, setShowInlineAdd] = useState(false);
   const [inlineTitle, setInlineTitle] = useState("");
+  const [showMandalart, setShowMandalart] = useState(false);
 
   // 농장 성장 계산
   const treeStats = trees.map(p => {
@@ -539,6 +542,7 @@ export function FarmCard({
   const stage = farmStage(trees.length, avgPct);
 
   return (
+    <>
     <div id={`farm-${farm.id}`} className="rounded-3xl border border-emerald-500/20 bg-emerald-950/20 overflow-hidden">
       {/* 농장 헤더 */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-emerald-500/10">
@@ -599,23 +603,23 @@ export function FarmCard({
         <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
-            aria-label="농장 위로 이동"
+            aria-label="농장 왼쪽으로 이동"
             disabled={isFirst}
             onClick={(e) => { e.stopPropagation(); onMoveUp(farm.id); }}
             className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
-            title="농장 위로 이동"
+            title="농장 왼쪽으로 이동"
           >
-            <ChevronUp className="size-3.5" />
+            <ChevronLeft className="size-3.5" />
           </button>
           <button
             type="button"
-            aria-label="농장 아래로 이동"
+            aria-label="농장 오른쪽으로 이동"
             disabled={isLast}
             onClick={(e) => { e.stopPropagation(); onMoveDown(farm.id); }}
             className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
-            title="농장 아래로 이동"
+            title="농장 오른쪽으로 이동"
           >
-            <ChevronDown className="size-3.5" />
+            <ChevronRight className="size-3.5" />
           </button>
           {(settings.aiChatEnabled ?? true) && (
             <button
@@ -651,6 +655,14 @@ export function FarmCard({
             title="이 농장에 나무 추가"
           >
             <Plus className="size-3.5" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowMandalart(true); }}
+            aria-label="만다라트 보기"
+            className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-400 transition"
+            title="만다라트 보기"
+          >
+            <LayoutGrid className="size-3.5" />
           </button>
           <button
             onClick={() => onDeleteFarm(farm.id)}
@@ -779,6 +791,17 @@ export function FarmCard({
         </div>
       )}
     </div>
+    {showMandalart && (
+      <MandalartOverlay
+        farm={farm}
+        trees={trees}
+        tasks={tasks}
+        onClose={() => setShowMandalart(false)}
+        onToggleProject={onToggleProject}
+        onAddTree={onAddTree}
+      />
+    )}
+    </>
   );
 }
 
