@@ -657,6 +657,7 @@ export function FarmCard({
             <Plus className="size-3.5" />
           </button>
           <button
+            type="button"
             onClick={(e) => { e.stopPropagation(); setShowMandalart(true); }}
             aria-label="만다라트 보기"
             className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-400 transition"
