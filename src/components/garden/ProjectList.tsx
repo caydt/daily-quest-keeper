@@ -996,67 +996,89 @@ export function ProjectList({
         </form>
       )}
 
-      {/* 농장들 */}
-      {sortedFarms.map((farm, idx) => (
-        <FarmCard
-          key={farm.id}
-          farm={farm}
-          trees={projects.filter(p => p.farmId === farm.id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0))}
-          tasks={tasks}
-          rewardXp={rewardXp}
-          allFarms={farms}
-          availableTools={availableTools}
-          onToggleProject={onToggle}
-          onDeleteProject={onDelete}
-          onDeleteFarm={onDeleteFarm}
-          onUpdateFarm={onUpdateFarm}
-          onToggleFarmTool={(toolId) => onToggleFarmTool(farm.id, toolId)}
-          onUnassign={(taskId) => onAssignTask(taskId, null)}
-          onMoveProjectToFarm={onMoveProjectToFarm}
-          onAddTree={(farmId, title) => onAdd(title, undefined, undefined, farmId)}
-          onAddSubTask={onAddSubTask}
-          onToggleProjectTool={onToggleProjectTool}
-          onUpdateProject={onUpdateProject}
-          settings={settings}
-          onAddTasksToProject={onAddTasksToProject}
-          isFirst={idx === 0}
-          isLast={idx === sortedFarms.length - 1}
-          onMoveUp={(id) => onMoveFarm(id, "up")}
-          onMoveDown={(id) => onMoveFarm(id, "down")}
-        />
-      ))}
-
-      {/* 독립 나무들 */}
-      {standaloneTrees.length > 0 && (
-        <div className="rounded-3xl border border-accent/20 bg-card/40 p-5 space-y-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-            <span>🌱</span>
-            <span>독립 나무 ({standaloneTrees.length}그루)</span>
-            <span className="text-[10px]">— 농장으로 옮겨 함께 키울 수 있어요</span>
-          </div>
-          <SortableContext items={standaloneTrees.map(p => p.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-2.5">
-              {standaloneTrees.map(p => (
-                <ProjectCard
-                  key={p.id}
-                  p={p}
-                  childTasks={tasks.filter(t => t.projectId === p.id)}
-                  rewardXp={rewardXp}
-                  farms={farms}
-                  availableTools={availableTools}
-                  onToggle={onToggle}
-                  onDelete={onDelete}
-                  onUnassign={(taskId) => onAssignTask(taskId, null)}
-                  onMoveToFarm={(farmId) => onMoveProjectToFarm(p.id, farmId)}
-                  onToggleProjectTool={(toolId) => onToggleProjectTool(p.id, toolId)}
-                  onUpdateProject={(patch) => onUpdateProject(p.id, patch)}
-                  onAddSubTask={onAddSubTask}
-                  settings={settings}
-                  onAddTasksToProject={onAddTasksToProject}
-                />
-              ))}
+      {/* 가로 스크롤 칸반 보드 */}
+      {(sortedFarms.length > 0 || standaloneTrees.length > 0) && (
+        <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory -mx-1 px-1">
+          {/* 농장 열들 */}
+          {sortedFarms.map((farm, idx) => (
+            <div
+              key={farm.id}
+              className="flex-none w-[260px] sm:w-[280px] snap-start"
+            >
+              <FarmCard
+                farm={farm}
+                trees={projects.filter(p => p.farmId === farm.id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0))}
+                tasks={tasks}
+                rewardXp={rewardXp}
+                allFarms={farms}
+                availableTools={availableTools}
+                onToggleProject={onToggle}
+                onDeleteProject={onDelete}
+                onDeleteFarm={onDeleteFarm}
+                onUpdateFarm={onUpdateFarm}
+                onToggleFarmTool={(toolId) => onToggleFarmTool(farm.id, toolId)}
+                onUnassign={(taskId) => onAssignTask(taskId, null)}
+                onMoveProjectToFarm={onMoveProjectToFarm}
+                onAddTree={(farmId, title) => onAdd(title, undefined, undefined, farmId)}
+                onAddSubTask={onAddSubTask}
+                onToggleProjectTool={onToggleProjectTool}
+                onUpdateProject={onUpdateProject}
+                settings={settings}
+                onAddTasksToProject={onAddTasksToProject}
+                isFirst={idx === 0}
+                isLast={idx === sortedFarms.length - 1}
+                onMoveUp={(id) => onMoveFarm(id, "up")}
+                onMoveDown={(id) => onMoveFarm(id, "down")}
+              />
             </div>
-          </SortableContext>
+          ))}
+
+          {/* 독립 나무 열 */}
+          {standaloneTrees.length > 0 && (
+            <div className="flex-none w-[260px] sm:w-[280px] snap-start">
+              <div className="rounded-3xl border border-accent/20 bg-card/40 overflow-hidden">
+                <div className="flex items-center gap-2 px-5 py-4 border-b border-accent/10">
+                  <span>🌱</span>
+                  <span className="font-bold text-sm">독립 나무</span>
+                  <span className="text-xs text-muted-foreground">({standaloneTrees.length}그루)</span>
+                </div>
+                <div className="p-4 space-y-2.5">
+                  <SortableContext items={standaloneTrees.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                    {standaloneTrees.map(p => (
+                      <ProjectCard
+                        key={p.id}
+                        p={p}
+                        childTasks={tasks.filter(t => t.projectId === p.id)}
+                        rewardXp={rewardXp}
+                        farms={farms}
+                        availableTools={availableTools}
+                        onToggle={onToggle}
+                        onDelete={onDelete}
+                        onUnassign={(taskId) => onAssignTask(taskId, null)}
+                        onMoveToFarm={(farmId) => onMoveProjectToFarm(p.id, farmId)}
+                        onToggleProjectTool={(toolId) => onToggleProjectTool(p.id, toolId)}
+                        onUpdateProject={(patch) => onUpdateProject(p.id, patch)}
+                        onAddSubTask={onAddSubTask}
+                        settings={settings}
+                        onAddTasksToProject={onAddTasksToProject}
+                      />
+                    ))}
+                  </SortableContext>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 농장 추가 버튼 열 */}
+          <div className="flex-none w-[180px] snap-start flex items-start pt-1">
+            <button
+              type="button"
+              onClick={() => setShowAddFarm(v => !v)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-dashed border-emerald-500/20 hover:border-emerald-500/40 hover:bg-emerald-950/20 text-emerald-400/60 hover:text-emerald-400 text-sm transition"
+            >
+              <Plus className="size-4" /> 농장 만들기
+            </button>
+          </div>
         </div>
       )}
 
