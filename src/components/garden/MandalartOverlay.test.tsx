@@ -2,10 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MandalartOverlay } from "./MandalartOverlay";
-import type { Farm, Project, Task, Settings } from "@/lib/garden-store";
+import type { Farm, Project, Task } from "@/lib/garden-store";
 
 const baseFarm: Farm = { id: "f1", title: "테스트 농장", icon: "🌾", createdAt: 0, order: 0 };
-const baseSettings: Settings = { morningTime: "07:00", eveningTime: "21:00" };
 
 const makeTree = (id: string, title: string, completed = false): Project => ({
   id, title, completed, createdAt: 0, order: parseInt(id.replace(/\D/g, "")) || 0,
@@ -18,7 +17,6 @@ const baseProps = {
   onClose: vi.fn(),
   onToggleProject: vi.fn(),
   onAddTree: vi.fn(),
-  settings: baseSettings,
 };
 
 describe("MandalartOverlay — 기본 그리드", () => {
@@ -70,5 +68,23 @@ describe("MandalartOverlay — 기본 그리드", () => {
     render(<MandalartOverlay {...baseProps} trees={trees} onToggleProject={onToggleProject} />);
     await userEvent.click(screen.getByTestId("mandalart-tree-p1"));
     expect(onToggleProject).toHaveBeenCalledWith("p1");
+  });
+
+  it("빈 슬롯 클릭 + prompt 입력 → onAddTree(farm.id, title) 호출", async () => {
+    vi.spyOn(window, "prompt").mockReturnValue("새 나무");
+    const onAddTree = vi.fn();
+    render(<MandalartOverlay {...baseProps} onAddTree={onAddTree} />);
+    await userEvent.click(screen.getByTestId("mandalart-empty-0"));
+    expect(onAddTree).toHaveBeenCalledWith("f1", "새 나무");
+    vi.restoreAllMocks();
+  });
+
+  it("빈 슬롯 클릭 + prompt 취소(null) → onAddTree 호출되지 않음", async () => {
+    vi.spyOn(window, "prompt").mockReturnValue(null);
+    const onAddTree = vi.fn();
+    render(<MandalartOverlay {...baseProps} onAddTree={onAddTree} />);
+    await userEvent.click(screen.getByTestId("mandalart-empty-0"));
+    expect(onAddTree).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
   });
 });

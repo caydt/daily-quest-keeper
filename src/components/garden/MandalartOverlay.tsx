@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { Farm, Project, Task, Settings } from "@/lib/garden-store";
+import type { Farm, Project, Task } from "@/lib/garden-store";
 import { treeStage, farmStage } from "@/lib/garden-store";
 import { X, Plus } from "lucide-react";
 import { TreeStageIcon, FarmStageIcon } from "./StageIcon";
@@ -11,7 +11,6 @@ type Props = {
   onClose: () => void;
   onToggleProject: (id: string) => void;
   onAddTree: (farmId: string, title: string) => void;
-  settings: Settings;
 };
 
 // 3×3 그리드 슬롯 매핑: null = 중앙(농장), 0~7 = 나무 인덱스
