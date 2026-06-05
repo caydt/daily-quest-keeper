@@ -1069,16 +1069,6 @@ export function ProjectList({
             </div>
           )}
 
-          {/* 농장 추가 버튼 열 */}
-          <div className="flex-none w-[180px] snap-start flex items-start pt-1">
-            <button
-              type="button"
-              onClick={() => setShowAddFarm(v => !v)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-dashed border-emerald-500/20 hover:border-emerald-500/40 hover:bg-emerald-950/20 text-emerald-400/60 hover:text-emerald-400 text-sm transition"
-            >
-              <Plus className="size-4" /> 농장 만들기
-            </button>
-          </div>
         </div>
       )}
 
