@@ -1,11 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import QRCode from "react-qr-code";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { useGarden } from "@/lib/garden-store";
 import { requestNotificationPermission } from "@/lib/notifications";
-import { getScriptUrl, setScriptUrl, testScriptUrl } from "@/lib/sheets-adapter";
-import { buildSetupLink, isValidScriptUrl } from "@/lib/setup-link";
-import { ArrowLeft, Bell, BellOff, Sunrise, Moon, Wrench, ExternalLink, Link2, CheckCircle2, XCircle, Loader2, Save, Bot, ToggleLeft, ToggleRight, Smartphone, Copy } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { ArrowLeft, Bell, BellOff, Sunrise, Moon, Wrench, ExternalLink, CheckCircle2, XCircle, Loader2, Save, Bot, ToggleLeft, ToggleRight, User, LogOut, LogIn } from "lucide-react";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -19,9 +17,8 @@ export const Route = createFileRoute("/settings")({
 
 function SettingsPage() {
   const { state, hydrated, updateSettings, setNotifications, saveNow, saveStatus } = useGarden();
-  const [scriptUrl, setScriptUrlState] = useState(() => getScriptUrl());
-  const [testState, setTestState] = useState<"idle" | "loading" | "ok" | "error">("idle");
-  const [testError, setTestError] = useState("");
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [aiProvider, setAiProvider] = useState<"gemini" | "openai" | "claude">(
     (state.settings.aiProvider as "gemini" | "openai" | "claude") ?? "gemini",
   );
@@ -30,33 +27,6 @@ function SettingsPage() {
   const [aiTestState, setAiTestState] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [aiTestError, setAiTestError] = useState("");
   const [toolsSheetUrlInput, setToolsSheetUrlInput] = useState(state.settings.toolsSheetUrl ?? "");
-  const [linkCopied, setLinkCopied] = useState(false);
-
-  // 셋업 링크는 저장된(=valid한) URL 기준으로 생성. 입력 중인 값으로 만들면 잘못된 링크가 공유될 수 있음.
-  const setupLink = useMemo(() => {
-    if (typeof window === "undefined") return null;
-    const url = scriptUrl.trim();
-    if (!isValidScriptUrl(url)) return null;
-    return buildSetupLink(url, window.location.origin + window.location.pathname);
-  }, [scriptUrl]);
-
-  const handleCopySetupLink = async () => {
-    if (!setupLink) return;
-    try {
-      await navigator.clipboard.writeText(setupLink);
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 1500);
-    } catch {
-      // clipboard 권한 없으면 input select fallback
-      const input = document.getElementById("setup-link-input") as HTMLInputElement | null;
-      input?.select();
-    }
-  };
-
-  const handleSaveScriptUrl = () => {
-    setScriptUrl(scriptUrl.trim());
-    window.location.reload();
-  };
 
   const handleTestAi = async () => {
     if (!aiApiKey.trim()) {
@@ -94,17 +64,6 @@ function SettingsPage() {
       aiApiKey: aiApiKey.trim(),
       aiModel: aiModel.trim() || undefined,
     });
-  };
-
-  const handleTestUrl = async () => {
-    setTestState("loading");
-    const result = await testScriptUrl(scriptUrl.trim());
-    if (result.ok) {
-      setTestState("ok");
-    } else {
-      setTestState("error");
-      setTestError(result.error ?? "알 수 없는 오류");
-    }
   };
 
   if (!hydrated) return <div className="min-h-dvh" />;
@@ -236,16 +195,16 @@ function SettingsPage() {
           </p>
         </section>
 
-        {/* Apps Script 동기화 */}
+        {/* 계정 / 기기 간 동기화 */}
         <section className="bg-card/60 border border-white/10 rounded-3xl p-6 space-y-4">
           <div className="flex items-start gap-3">
             <div className="size-10 rounded-xl bg-gradient-bloom flex items-center justify-center shrink-0">
-              <Link2 className="size-5 text-primary" />
+              <User className="size-5 text-primary" />
             </div>
             <div className="flex-1">
-              <h2 className="font-semibold">데이터 동기화 (Google Apps Script)</h2>
+              <h2 className="font-semibold">계정 동기화</h2>
               <p className="text-xs text-muted-foreground mt-1">
-                구글 시트에 Apps Script 웹앱을 배포하고 URL을 붙여넣으면 모든 기기에서 데이터가 동기화돼요.
+                로그인하면 모든 기기에서 데이터가 자동으로 동기화돼요.
               </p>
             </div>
           </div>

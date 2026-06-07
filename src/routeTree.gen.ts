@@ -13,6 +13,7 @@ import { Route as ToolsRouteImport } from './routes/tools'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReviewRouteImport } from './routes/review'
 import { Route as MapRouteImport } from './routes/map'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 
 const ToolsRoute = ToolsRouteImport.update({
@@ -35,6 +36,11 @@ const MapRoute = MapRouteImport.update({
   path: '/map',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -43,6 +49,7 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/map': typeof MapRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/map': typeof MapRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/map': typeof MapRoute
   '/review': typeof ReviewRoute
   '/settings': typeof SettingsRoute
@@ -65,14 +74,15 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/map' | '/review' | '/settings' | '/tools'
+  fullPaths: '/' | '/auth' | '/map' | '/review' | '/settings' | '/tools'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/map' | '/review' | '/settings' | '/tools'
-  id: '__root__' | '/' | '/map' | '/review' | '/settings' | '/tools'
+  to: '/' | '/auth' | '/map' | '/review' | '/settings' | '/tools'
+  id: '__root__' | '/' | '/auth' | '/map' | '/review' | '/settings' | '/tools'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRoute
   MapRoute: typeof MapRoute
   ReviewRoute: typeof ReviewRoute
   SettingsRoute: typeof SettingsRoute
@@ -109,6 +119,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MapRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -121,6 +138,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRoute,
   MapRoute: MapRoute,
   ReviewRoute: ReviewRoute,
   SettingsRoute: SettingsRoute,
