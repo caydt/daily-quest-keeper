@@ -37,7 +37,7 @@ const baseProps = {
 };
 
 describe("FarmCard 순서 변경 버튼", () => {
-  it("▲ 버튼 클릭 시 onMoveUp(farm.id) 호출", async () => {
+  it("◀ 버튼 클릭 시 onMoveUp(farm.id) 호출", async () => {
     const onMoveUp = vi.fn();
     render(
       <FarmCard
@@ -48,13 +48,12 @@ describe("FarmCard 순서 변경 버튼", () => {
         onMoveDown={vi.fn()}
       />,
     );
-
-    await userEvent.click(screen.getByRole("button", { name: "농장 위로 이동" }));
+    await userEvent.click(screen.getByRole("button", { name: "농장 왼쪽으로 이동" }));
     expect(onMoveUp).toHaveBeenCalledTimes(1);
     expect(onMoveUp).toHaveBeenCalledWith("f1");
   });
 
-  it("▼ 버튼 클릭 시 onMoveDown(farm.id) 호출", async () => {
+  it("▶ 버튼 클릭 시 onMoveDown(farm.id) 호출", async () => {
     const onMoveDown = vi.fn();
     render(
       <FarmCard
@@ -65,13 +64,12 @@ describe("FarmCard 순서 변경 버튼", () => {
         onMoveDown={onMoveDown}
       />,
     );
-
-    await userEvent.click(screen.getByRole("button", { name: "농장 아래로 이동" }));
+    await userEvent.click(screen.getByRole("button", { name: "농장 오른쪽으로 이동" }));
     expect(onMoveDown).toHaveBeenCalledTimes(1);
     expect(onMoveDown).toHaveBeenCalledWith("f1");
   });
 
-  it("isFirst=true 일 때 ▲ 버튼은 disabled", () => {
+  it("isFirst=true 일 때 ◀ 버튼은 disabled", () => {
     render(
       <FarmCard
         {...baseProps}
@@ -81,11 +79,11 @@ describe("FarmCard 순서 변경 버튼", () => {
         onMoveDown={vi.fn()}
       />,
     );
-    expect(screen.getByRole("button", { name: "농장 위로 이동" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "농장 아래로 이동" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "농장 왼쪽으로 이동" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "농장 오른쪽으로 이동" })).not.toBeDisabled();
   });
 
-  it("isLast=true 일 때 ▼ 버튼은 disabled", () => {
+  it("isLast=true 일 때 ▶ 버튼은 disabled", () => {
     render(
       <FarmCard
         {...baseProps}
@@ -95,11 +93,11 @@ describe("FarmCard 순서 변경 버튼", () => {
         onMoveDown={vi.fn()}
       />,
     );
-    expect(screen.getByRole("button", { name: "농장 위로 이동" })).not.toBeDisabled();
-    expect(screen.getByRole("button", { name: "농장 아래로 이동" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "농장 왼쪽으로 이동" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "농장 오른쪽으로 이동" })).toBeDisabled();
   });
 
-  it("isFirst=true 상태에서 ▲ 클릭 — 핸들러 호출되지 않음", async () => {
+  it("isFirst=true 상태에서 ◀ 클릭 — 핸들러 호출되지 않음", async () => {
     const onMoveUp = vi.fn();
     render(
       <FarmCard
@@ -110,11 +108,11 @@ describe("FarmCard 순서 변경 버튼", () => {
         onMoveDown={vi.fn()}
       />,
     );
-    await userEvent.click(screen.getByRole("button", { name: "농장 위로 이동" }));
+    await userEvent.click(screen.getByRole("button", { name: "농장 왼쪽으로 이동" }));
     expect(onMoveUp).not.toHaveBeenCalled();
   });
 
-  it("isLast=true 상태에서 ▼ 클릭 — 핸들러 호출되지 않음", async () => {
+  it("isLast=true 상태에서 ▶ 클릭 — 핸들러 호출되지 않음", async () => {
     const onMoveDown = vi.fn();
     render(
       <FarmCard
@@ -125,7 +123,21 @@ describe("FarmCard 순서 변경 버튼", () => {
         onMoveDown={onMoveDown}
       />,
     );
-    await userEvent.click(screen.getByRole("button", { name: "농장 아래로 이동" }));
+    await userEvent.click(screen.getByRole("button", { name: "농장 오른쪽으로 이동" }));
     expect(onMoveDown).not.toHaveBeenCalled();
+  });
+
+  it("만다라트 버튼 클릭 → 만다라트 오버레이 표시", async () => {
+    render(
+      <FarmCard
+        {...baseProps}
+        isFirst={false}
+        isLast={false}
+        onMoveUp={vi.fn()}
+        onMoveDown={vi.fn()}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "만다라트 보기" }));
+    expect(screen.getByTestId("mandalart-center")).toBeInTheDocument();
   });
 });
