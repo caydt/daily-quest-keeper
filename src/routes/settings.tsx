@@ -209,266 +209,49 @@ function SettingsPage() {
             </div>
           </div>
 
-          <input
-            type="url"
-            placeholder="https://script.google.com/macros/s/.../exec"
-            value={scriptUrl}
-            onChange={(e) => {
-              setScriptUrlState(e.target.value);
-              setTestState("idle");
-            }}
-            className="w-full px-3 py-2.5 rounded-xl bg-input/40 border border-white/10 text-sm focus:border-primary/40 focus:outline-none"
-          />
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => void handleTestUrl()}
-              disabled={!scriptUrl.trim() || testState === "loading"}
-              className="px-4 py-2 rounded-xl border border-white/10 bg-card/60 hover:border-primary/40 text-sm text-muted-foreground hover:text-primary transition disabled:opacity-50 flex items-center gap-2"
-            >
-              {testState === "loading" && <Loader2 className="size-3.5 animate-spin" />}
-              {testState === "ok" && <CheckCircle2 className="size-3.5 text-emerald-400" />}
-              {testState === "error" && <XCircle className="size-3.5 text-rose-400" />}
-              {testState === "idle" && "연결 테스트"}
-              {testState === "loading" && "테스트 중..."}
-              {testState === "ok" && "연결 성공!"}
-              {testState === "error" && "연결 실패"}
-            </button>
-
-            <button
-              onClick={handleSaveScriptUrl}
-              disabled={!scriptUrl.trim()}
-              className="px-4 py-2 rounded-xl bg-primary/15 border border-primary/40 text-primary text-sm font-semibold hover:bg-primary/25 transition disabled:opacity-40"
-            >
-              저장
-            </button>
-          </div>
-
-          {testState === "error" && (
-            <p className="text-xs text-rose-400">{testError}</p>
-          )}
-
-          {/* 수동 저장 */}
-          {getScriptUrl() && (
-            <div className="flex items-center gap-3 pt-1">
-              <button
-                onClick={() => void saveNow()}
-                disabled={saveStatus === "saving"}
-                className="px-4 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-sm font-semibold hover:bg-emerald-500/25 transition disabled:opacity-50 flex items-center gap-2"
-              >
-                {saveStatus === "saving" ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Save className="size-3.5" />
-                )}
-                {saveStatus === "saving" ? "저장 중..." : "지금 저장"}
-              </button>
+          {user ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+                <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-emerald-400">로그인됨</p>
+                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => void saveNow()}
+                  disabled={saveStatus === "saving"}
+                  className="flex-1 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-sm font-semibold hover:bg-emerald-500/25 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {saveStatus === "saving" ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+                  {saveStatus === "saving" ? "저장 중..." : "지금 저장"}
+                </button>
+                <button
+                  onClick={() => void logout().then(() => void navigate({ to: "/" }))}
+                  className="px-4 py-2 rounded-xl border border-white/10 text-muted-foreground hover:text-rose-400 hover:border-rose-400/30 text-sm transition flex items-center gap-2"
+                >
+                  <LogOut className="size-3.5" />
+                  로그아웃
+                </button>
+              </div>
               {saveStatus === "saved" && (
-                <span className="text-xs text-emerald-400 flex items-center gap-1">
-                  <CheckCircle2 className="size-3.5" /> 저장됨
-                </span>
+                <p className="text-xs text-emerald-400 flex items-center gap-1"><CheckCircle2 className="size-3.5" /> 저장됨</p>
               )}
               {saveStatus === "error" && (
-                <span className="text-xs text-rose-400 flex items-center gap-1">
-                  <XCircle className="size-3.5" /> 저장 실패 (로컬에 백업됨)
-                </span>
+                <p className="text-xs text-rose-400 flex items-center gap-1"><XCircle className="size-3.5" /> 저장 실패 (로컬에 백업됨)</p>
               )}
             </div>
+          ) : (
+            <button
+              onClick={() => void navigate({ to: "/auth" })}
+              className="w-full py-2.5 rounded-xl bg-primary/15 border border-primary/40 text-primary text-sm font-semibold hover:bg-primary/25 transition flex items-center justify-center gap-2"
+            >
+              <LogIn className="size-4" />
+              로그인 / 회원가입
+            </button>
           )}
 
-          {/* 기기 간 연동 — 셋업 링크 + QR */}
-          <div className="rounded-2xl bg-primary/5 border border-primary/20 p-4 space-y-3">
-            <div className="flex items-start gap-2">
-              <Smartphone className="size-4 text-primary mt-0.5 shrink-0" />
-              <div className="text-xs text-foreground/80 space-y-1">
-                <p className="font-semibold text-primary">다른 기기에서 같은 데이터 보기</p>
-                <p className="text-muted-foreground">
-                  아래 링크를 카톡/메모로 보내고 그 기기에서 한 번만 클릭하면 끝. PC는 링크 클릭, 폰은 QR 스캔도 가능해요.
-                </p>
-              </div>
-            </div>
-
-            {setupLink ? (
-              <>
-                <div className="flex gap-2">
-                  <input
-                    id="setup-link-input"
-                    type="text"
-                    readOnly
-                    value={setupLink}
-                    onClick={(e) => (e.target as HTMLInputElement).select()}
-                    className="flex-1 px-3 py-2 rounded-xl bg-input/40 border border-white/10 text-xs font-mono text-muted-foreground"
-                  />
-                  <button
-                    onClick={() => void handleCopySetupLink()}
-                    className="px-3 py-2 rounded-xl border border-primary/40 bg-primary/15 text-primary text-xs font-semibold hover:bg-primary/25 transition flex items-center gap-1"
-                    aria-label="셋업 링크 복사"
-                  >
-                    {linkCopied ? <CheckCircle2 className="size-3.5" /> : <Copy className="size-3.5" />}
-                    {linkCopied ? "복사됨" : "복사"}
-                  </button>
-                </div>
-
-                <div className="flex justify-center pt-2">
-                  <div className="bg-white p-3 rounded-xl">
-                    <QRCode value={setupLink} size={160} />
-                  </div>
-                </div>
-              </>
-            ) : (
-              <p className="text-xs text-amber-300/80">
-                위에 유효한 Apps Script URL을 먼저 저장하면 셋업 링크와 QR이 여기에 나타나요.
-              </p>
-            )}
-
-            <p className="text-[11px] text-muted-foreground/70 pt-1 leading-relaxed">
-              ⚠️ 이 링크는 시트 접근 권한 그 자체예요. 다른 사람이 받으면 데이터를 볼 수 있으니 본인 기기로만 보내세요.
-            </p>
-          </div>
-
-          <div className="rounded-2xl bg-background/40 border border-white/10 p-4 text-xs text-muted-foreground space-y-2">
-            <div className="font-semibold text-foreground">⚙️ Apps Script 배포 방법</div>
-            <ol className="space-y-1 list-decimal list-inside">
-              <li>구글 시트 열기 → 확장 프로그램 → Apps Script</li>
-              <li>아래 코드를 붙여넣고 저장</li>
-            </ol>
-            <pre className="bg-black/30 rounded px-2 py-2 text-[10px] font-mono text-primary/90 overflow-x-auto whitespace-pre">{`/**
- * 루미 가든 Apps Script 백엔드.
- * 자세한 API: docs/openclaw-integration.md
- */
-const SHEET_NAME = "Sheet1";
-
-function getSheet_() {
-  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-}
-function readState_() {
-  const raw = getSheet_().getRange("A1").getValue();
-  return raw ? JSON.parse(raw) : {};
-}
-function writeState_(state) {
-  const sheet = getSheet_();
-  sheet.getRange("A1").setValue(JSON.stringify(state));
-  sheet.getRange("A2").setValue(new Date().toISOString());
-}
-function todayStr_() {
-  const d = new Date();
-  return d.getFullYear() + "-" +
-    String(d.getMonth() + 1).padStart(2, "0") + "-" +
-    String(d.getDate()).padStart(2, "0");
-}
-function jsonOk_(data, extra) {
-  const p = Object.assign({ ok: true }, extra || {}, data ? { data } : {});
-  return ContentService.createTextOutput(JSON.stringify(p))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-function jsonError_(msg) {
-  return ContentService.createTextOutput(JSON.stringify({ ok: false, error: msg }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function doGet() {
-  return jsonOk_(readState_());
-}
-
-function doPost(e) {
-  const lock = LockService.getScriptLock();
-  if (!lock.tryLock(5000)) return jsonError_("busy, try again");
-  try {
-    const body = JSON.parse(e.postData.contents);
-    if (body && typeof body.action === "string") return handleAction_(body);
-    writeState_(body);
-    return jsonOk_(null);
-  } catch (err) {
-    return jsonError_(err.message || "unknown error");
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-function handleAction_(body) {
-  const state = readState_();
-  state.tasks = state.tasks || [];
-  state.farms = state.farms || [];
-  state.projects = state.projects || [];
-  switch (body.action) {
-    case "add_task": return addTaskAction_(state, body);
-    case "complete_task": return completeTaskAction_(state, body);
-    case "set_condition": return setConditionAction_(state, body);
-    case "add_farm": return addFarmAction_(state, body);
-    case "add_tree": return addTreeAction_(state, body);
-    default: return jsonError_("unknown action: " + body.action);
-  }
-}
-
-function addTaskAction_(state, body) {
-  const title = (body.title || "").trim();
-  if (!title) return jsonError_("title is required");
-  state.tasks.push({
-    id: Utilities.getUuid(), title: title,
-    time: body.time || "09:00", difficulty: body.difficulty || "medium",
-    kind: body.kind || "flex", completed: false, createdAt: Date.now(),
-    date: body.date || todayStr_(), postponedCount: 0,
-    order: state.tasks.length, projectId: body.projectId || null,
-  });
-  writeState_(state);
-  return jsonOk_(state, { action: "add_task" });
-}
-
-function completeTaskAction_(state, body) {
-  let target = null;
-  if (body.id) target = state.tasks.find(function(t) { return t.id === body.id; });
-  else if (body.title) {
-    const t = todayStr_(), tl = body.title.toLowerCase();
-    target = state.tasks.find(function(x) { return x.date === t && x.title.toLowerCase() === tl; });
-  }
-  if (!target) return jsonError_("task not found");
-  target.completed = !target.completed;
-  if (target.completed) target.completedAt = Date.now();
-  else delete target.completedAt;
-  writeState_(state);
-  return jsonOk_(state, { action: "complete_task" });
-}
-
-function setConditionAction_(state, body) {
-  if (["best","normal","low","sick"].indexOf(body.mode) === -1)
-    return jsonError_("invalid mode: " + body.mode);
-  state.condition = body.mode;
-  state.conditionSetAt = Date.now();
-  writeState_(state);
-  return jsonOk_(state, { action: "set_condition" });
-}
-
-function addFarmAction_(state, body) {
-  const title = (body.title || "").trim();
-  if (!title) return jsonError_("title is required");
-  state.farms.push({
-    id: Utilities.getUuid(), title: title,
-    icon: body.icon || "🌾", createdAt: Date.now(),
-    order: state.farms.length,
-  });
-  writeState_(state);
-  return jsonOk_(state, { action: "add_farm" });
-}
-
-function addTreeAction_(state, body) {
-  const title = (body.title || "").trim();
-  if (!title) return jsonError_("title is required");
-  state.projects.push({
-    id: Utilities.getUuid(), title: title,
-    description: body.description || "", completed: false,
-    createdAt: Date.now(), order: state.projects.length,
-    farmId: body.farmId || null,
-  });
-  writeState_(state);
-  return jsonOk_(state, { action: "add_tree" });
-}`}</pre>
-            <ol start={3} className="space-y-1 list-decimal list-inside">
-              <li>배포 → 새 배포 → 유형: 웹앱</li>
-              <li><strong className="text-foreground">실행: 나 / 액세스: 모든 사용자 (로그인 불필요)</strong></li>
-              <li>배포 후 URL 복사해서 위에 붙여넣기</li>
-              <li className="text-rose-400/80">⚠️ "Google 계정이 있는 사용자"로 설정하면 다른 기기에서 막힙니다</li>
-            </ol>
-          </div>
         </section>
 
         {/* Tools sheet */}

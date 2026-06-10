@@ -545,134 +545,128 @@ export function FarmCard({
     <>
     <div id={`farm-${farm.id}`} className="rounded-3xl border border-emerald-500/20 bg-emerald-950/20 overflow-hidden">
       {/* 농장 헤더 */}
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-emerald-500/10">
-        <button
-          onClick={() => setCollapsed(v => !v)}
-          className="text-muted-foreground hover:text-foreground transition"
-        >
-          {collapsed ? <ChevronRight className="size-4" /> : <ChevronDown className="size-4" />}
-        </button>
-
-        <FarmStageIcon tier={stage.tier as 1 | 2 | 3 | 4 | 5} size={28} />
-
-        {editing ? (
-          <form
-            className="flex items-center gap-2 flex-1"
-            onSubmit={(e) => {
-              e.preventDefault();
-              onUpdateFarm(farm.id, { title: editTitle, icon: editIcon, aiUrl: editAiUrl.trim() || undefined });
-              setEditing(false);
-            }}
+      <div className="px-4 pt-4 pb-2 border-b border-emerald-500/10">
+        {/* 제목 행 */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCollapsed(v => !v)}
+            className="text-muted-foreground hover:text-foreground transition shrink-0"
           >
-            <input
-              value={editIcon}
-              onChange={e => setEditIcon(e.target.value)}
-              className="w-10 bg-input/40 border border-white/10 rounded-lg text-center text-sm py-1"
-              placeholder="🌾"
-            />
-            <input
-              value={editTitle}
-              onChange={e => setEditTitle(e.target.value)}
-              className="flex-1 bg-input/40 border border-white/10 rounded-lg px-2 py-1 text-sm"
-              autoFocus
-            />
-            <input
-              value={editAiUrl}
-              onChange={(e) => setEditAiUrl(e.target.value)}
-              placeholder="AI URL (NotebookLM, ChatGPT 등, 선택)"
-              className="flex-1 bg-input/40 border border-white/10 rounded-lg px-2 py-1 text-sm mt-1"
-              type="url"
-            />
-            <button type="submit" className="text-xs text-primary font-semibold px-2">저장</button>
-            <button type="button" onClick={() => setEditing(false)} className="text-xs text-muted-foreground px-1">취소</button>
-          </form>
-        ) : (
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="font-bold text-emerald-300">{farm.title}</h3>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                {stage.label}
-              </span>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              나무 {trees.length}그루 · 평균 {Math.round(avgPct)}% 완료
-            </p>
+            {collapsed ? <ChevronRight className="size-4" /> : <ChevronDown className="size-4" />}
+          </button>
+
+          <FarmStageIcon tier={stage.tier as 1 | 2 | 3 | 4 | 5} size={24} />
+
+          {editing ? (
+            <form
+              className="flex items-center gap-1.5 flex-1 min-w-0"
+              onSubmit={(e) => {
+                e.preventDefault();
+                onUpdateFarm(farm.id, { title: editTitle, icon: editIcon, aiUrl: editAiUrl.trim() || undefined });
+                setEditing(false);
+              }}
+            >
+              <input
+                value={editIcon}
+                onChange={e => setEditIcon(e.target.value)}
+                className="w-8 bg-input/40 border border-white/10 rounded-lg text-center text-sm py-1"
+                placeholder="🌾"
+              />
+              <input
+                value={editTitle}
+                onChange={e => setEditTitle(e.target.value)}
+                className="flex-1 min-w-0 bg-input/40 border border-white/10 rounded-lg px-2 py-1 text-sm"
+                autoFocus
+              />
+              <button type="submit" className="text-xs text-primary font-semibold px-1 shrink-0">저장</button>
+              <button type="button" onClick={() => setEditing(false)} className="text-xs text-muted-foreground px-1 shrink-0">취소</button>
+            </form>
+          ) : (
+            <h3 className="flex-1 min-w-0 font-bold text-emerald-300 truncate">{farm.title}</h3>
+          )}
+
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button
+              type="button"
+              aria-label="농장 왼쪽으로 이동"
+              disabled={isFirst}
+              onClick={(e) => { e.stopPropagation(); onMoveUp(farm.id); }}
+              className="p-1 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition disabled:opacity-30 disabled:cursor-not-allowed"
+              title="농장 왼쪽으로 이동"
+            >
+              <ChevronLeft className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label="농장 오른쪽으로 이동"
+              disabled={isLast}
+              onClick={(e) => { e.stopPropagation(); onMoveDown(farm.id); }}
+              className="p-1 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition disabled:opacity-30 disabled:cursor-not-allowed"
+              title="농장 오른쪽으로 이동"
+            >
+              <ChevronRight className="size-3.5" />
+            </button>
+            {(settings.aiChatEnabled ?? true) && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowAiChat((v) => !v); }}
+                className={`p-1 rounded-lg hover:bg-white/5 transition ${showAiChat ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
+                title="AI와 대화"
+              >
+                <MessageCircle className="size-3.5" />
+              </button>
+            )}
+            {farm.aiUrl && (
+              <a
+                href={farm.aiUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-1 rounded-lg hover:bg-white/5 text-emerald-400 hover:text-emerald-300 transition"
+                title="AI 열기"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <ExternalLink className="size-3.5" />
+              </a>
+            )}
+            <button
+              onClick={() => setEditing(v => !v)}
+              className="p-1 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition"
+              title="농장 수정"
+            >
+              <Pencil className="size-3.5" />
+            </button>
+            <button
+              onClick={() => { setShowInlineAdd(v => !v); setInlineTitle(""); }}
+              className="p-1 rounded-lg hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-400 transition"
+              title="이 농장에 나무 추가"
+            >
+              <Plus className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowMandalart(true); }}
+              aria-label="만다라트 보기"
+              className="p-1 rounded-lg hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-400 transition"
+              title="만다라트 보기"
+            >
+              <LayoutGrid className="size-3.5" />
+            </button>
+            <button
+              onClick={() => onDeleteFarm(farm.id)}
+              className="p-1 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition"
+              title="농장 삭제"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
           </div>
+        </div>
+
+        {/* 통계 행 */}
+        {!editing && (
+          <p className="text-[11px] text-muted-foreground mt-1 pl-8">
+            나무 {trees.length}그루 · 평균 {Math.round(avgPct)}% 완료
+          </p>
         )}
 
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            aria-label="농장 왼쪽으로 이동"
-            disabled={isFirst}
-            onClick={(e) => { e.stopPropagation(); onMoveUp(farm.id); }}
-            className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
-            title="농장 왼쪽으로 이동"
-          >
-            <ChevronLeft className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            aria-label="농장 오른쪽으로 이동"
-            disabled={isLast}
-            onClick={(e) => { e.stopPropagation(); onMoveDown(farm.id); }}
-            className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
-            title="농장 오른쪽으로 이동"
-          >
-            <ChevronRight className="size-3.5" />
-          </button>
-          {(settings.aiChatEnabled ?? true) && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowAiChat((v) => !v); }}
-              className={`p-1.5 rounded-lg hover:bg-white/5 transition ${showAiChat ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
-              title="AI와 대화"
-            >
-              <MessageCircle className="size-3.5" />
-            </button>
-          )}
-          {farm.aiUrl && (
-            <a
-              href={farm.aiUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-1.5 rounded-lg hover:bg-white/5 text-emerald-400 hover:text-emerald-300 transition"
-              title="AI 열기"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <ExternalLink className="size-3.5" />
-            </a>
-          )}
-          <button
-            onClick={() => setEditing(v => !v)}
-            className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition"
-            title="농장 수정"
-          >
-            <Pencil className="size-3.5" />
-          </button>
-          <button
-            onClick={() => { setShowInlineAdd(v => !v); setInlineTitle(""); }}
-            className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-400 transition"
-            title="이 농장에 나무 추가"
-          >
-            <Plus className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setShowMandalart(true); }}
-            aria-label="만다라트 보기"
-            className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-400 transition"
-            title="만다라트 보기"
-          >
-            <LayoutGrid className="size-3.5" />
-          </button>
-          <button
-            onClick={() => onDeleteFarm(farm.id)}
-            className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition"
-            title="농장 삭제"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
-        </div>
       </div>
 
       {/* 도구 바 */}
@@ -1003,7 +997,7 @@ export function ProjectList({
           {sortedFarms.map((farm, idx) => (
             <div
               key={farm.id}
-              className="flex-none w-[260px] sm:w-[280px] snap-start"
+              className="flex-none w-[85vw] max-w-[380px] sm:w-[380px] sm:max-w-none snap-start"
             >
               <FarmCard
                 farm={farm}
@@ -1035,7 +1029,7 @@ export function ProjectList({
 
           {/* 독립 나무 열 */}
           {standaloneTrees.length > 0 && (
-            <div className="flex-none w-[260px] sm:w-[280px] snap-start">
+            <div className="flex-none w-[85vw] max-w-[320px] sm:w-[320px] sm:max-w-none snap-start">
               <div className="rounded-3xl border border-accent/20 bg-card/40 overflow-hidden">
                 <div className="flex items-center gap-2 px-5 py-4 border-b border-accent/10">
                   <span>🌱</span>
