@@ -327,10 +327,6 @@ export function useGarden() {
   const [hydrated, setHydrated] = useState(false);
   const [syncReady, setSyncReady] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
-  const [pendingMigration, setPendingMigration] = useState<{
-    local: GardenState;
-    remote: GardenState;
-  } | null>(null);
   const migrationDone = useRef(false);
   const isApplyingRemote = useRef(false);
   const userTouched = useRef(false);
@@ -406,17 +402,11 @@ export function useGarden() {
         const mergedSettings = { ...initial.settings, ...(remote.settings || {}) };
         migrateLegacyCondition(remote, mergedSettings.morningTime);
 
-        // ④ 로컬 + 원격 둘 다 있으면 마이그레이션 선택 대기
-        if (local && !migrationDone.current) {
-          if (!cancelled) setPendingMigration({ local, remote });
-          // syncReady를 false로 유지 — 마이그레이션 선택 전 자동 save 방지.
-          // resolveMigration 호출 시 setSyncReady(true)됨. 탭을 닫으면 다음 hydrate에서 다시 선택.
-          return;
-        }
-
+        // ④ 원격 데이터 적용 (로컬+원격 충돌 시 원격 우선 — 자동 병합)
         if (!userTouched.current) {
           applyState(mergeState(remote));
         }
+        migrationDone.current = true;
         if (!cancelled) setSyncReady(true);
       } catch {
         if (!cancelled) setSyncReady(true);
@@ -1065,47 +1055,6 @@ export function useGarden() {
     });
   }, []);
 
-  const resolveMigration = useCallback(
-    async (choice: "local" | "remote") => {
-      if (!pendingMigration) return;
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const adapter = createSupabaseAdapter(session.user.id);
-
-      const mergeState = (data: Partial<GardenState>): GardenState => ({
-        ...initial,
-        ...data,
-        settings: { ...initial.settings, ...(data.settings || {}) },
-        history: (data as GardenState).history || [],
-        projects: (data as GardenState).projects || [],
-        farms: (data as GardenState).farms || [],
-        achievements: (data as GardenState).achievements || {},
-        localTools: (data as GardenState).localTools || [],
-        pledges: (data as GardenState).pledges || [],
-      });
-
-      const chosen =
-        choice === "local" ? pendingMigration.local : pendingMigration.remote;
-
-      if (choice === "local") {
-        await adapter.save(pendingMigration.local).catch(() => {});
-      }
-
-      // setStateUser 대신 setState: isApplyingRemote=true로 save 레이스 방지 (applyState와 동일 패턴)
-      isApplyingRemote.current = true;
-      setState(mergeState(chosen));
-      requestAnimationFrame(() => {
-        isApplyingRemote.current = false;
-      });
-      migrationDone.current = true;
-      setPendingMigration(null);
-      setSyncReady(true);
-    },
-    [pendingMigration],
-  );
 
   // 수동 저장. inFlightSave 체인으로 debounced save와 함께 직렬화.
   const saveNow = useCallback(async () => {
@@ -1149,8 +1098,6 @@ export function useGarden() {
     hydrated,
     syncReady,
     saveStatus,
-    pendingMigration,
-    resolveMigration,
     saveNow,
     todayCondition,
     addTask,
