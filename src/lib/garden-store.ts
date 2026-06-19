@@ -1141,10 +1141,8 @@ export function useGarden() {
 
   // 컨디션은 morningTime 기준 하루 단위로 reset. 새 day-window의 첫 접속 시 picker.
   // timestamp 기반이라 morningTime 변경에도 안정적 — 설정값 바꿔도 같은 window 내라면 유지.
-  const todayCondition: ConditionMode | null =
-    state.conditionSetAt != null && state.conditionSetAt >= lastMorningCrossing(state.settings.morningTime)
-      ? state.condition
-      : null;
+  // 한 번 설정하면 유지 — 매일 초기화 없음. 헤더 칩으로 언제든 변경 가능.
+  const todayCondition: ConditionMode | null = state.condition;
 
   return {
     state,
