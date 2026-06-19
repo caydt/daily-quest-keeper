@@ -402,7 +402,15 @@ export function useGarden() {
         const mergedSettings = { ...initial.settings, ...(remote.settings || {}) };
         migrateLegacyCondition(remote, mergedSettings.morningTime);
 
-        // ④ 원격 데이터 적용 (로컬+원격 충돌 시 원격 우선 — 자동 병합)
+        // ④ 로컬 데이터를 Supabase에 업로드 (로그인 목적이 동기화이므로 로컬 우선)
+        if (local && !migrationDone.current) {
+          await adapter.save(local).catch(() => {});
+          migrationDone.current = true;
+          if (!userTouched.current) applyState(mergeState(local));
+          if (!cancelled) setSyncReady(true);
+          return;
+        }
+
         if (!userTouched.current) {
           applyState(mergeState(remote));
         }
