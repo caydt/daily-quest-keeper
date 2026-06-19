@@ -588,21 +588,21 @@ export function FarmCard({
           <div className="flex items-center gap-0.5 shrink-0">
             <button
               type="button"
-              aria-label="농장 왼쪽으로 이동"
+              aria-label="농장 앞으로 이동"
               disabled={isFirst}
               onClick={(e) => { e.stopPropagation(); onMoveUp(farm.id); }}
               className="p-1 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition disabled:opacity-30 disabled:cursor-not-allowed"
-              title="농장 왼쪽으로 이동"
+              title="농장 앞으로 이동"
             >
               <ChevronLeft className="size-3.5" />
             </button>
             <button
               type="button"
-              aria-label="농장 오른쪽으로 이동"
+              aria-label="농장 뒤로 이동"
               disabled={isLast}
               onClick={(e) => { e.stopPropagation(); onMoveDown(farm.id); }}
               className="p-1 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition disabled:opacity-30 disabled:cursor-not-allowed"
-              title="농장 오른쪽으로 이동"
+              title="농장 뒤로 이동"
             >
               <ChevronRight className="size-3.5" />
             </button>
@@ -990,15 +990,12 @@ export function ProjectList({
         </form>
       )}
 
-      {/* 가로 스크롤 칸반 보드 */}
+      {/* 2열 그리드 레이아웃 */}
       {(sortedFarms.length > 0 || standaloneTrees.length > 0) && (
-        <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory -mx-1 px-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* 농장 열들 */}
           {sortedFarms.map((farm, idx) => (
-            <div
-              key={farm.id}
-              className="flex-none w-[85vw] max-w-[380px] sm:w-[380px] sm:max-w-none snap-start"
-            >
+            <div key={farm.id}>
               <FarmCard
                 farm={farm}
                 trees={projects.filter(p => p.farmId === farm.id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0))}
@@ -1029,7 +1026,7 @@ export function ProjectList({
 
           {/* 독립 나무 열 */}
           {standaloneTrees.length > 0 && (
-            <div className="flex-none w-[85vw] max-w-[320px] sm:w-[320px] sm:max-w-none snap-start">
+            <div>
               <div className="rounded-3xl border border-accent/20 bg-card/40 overflow-hidden">
                 <div className="flex items-center gap-2 px-5 py-4 border-b border-accent/10">
                   <span>🌱</span>
