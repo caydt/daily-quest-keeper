@@ -402,15 +402,7 @@ export function useGarden() {
         const mergedSettings = { ...initial.settings, ...(remote.settings || {}) };
         migrateLegacyCondition(remote, mergedSettings.morningTime);
 
-        // ④ 로컬 데이터를 Supabase에 업로드 (로그인 목적이 동기화이므로 로컬 우선)
-        if (local && !migrationDone.current) {
-          await adapter.save(local).catch(() => {});
-          migrationDone.current = true;
-          if (!userTouched.current) applyState(mergeState(local));
-          if (!cancelled) setSyncReady(true);
-          return;
-        }
-
+        // ④ Supabase 데이터가 있으면 원격 우선 (다기기 sync source of truth)
         if (!userTouched.current) {
           applyState(mergeState(remote));
         }
@@ -425,6 +417,41 @@ export function useGarden() {
     return () => {
       cancelled = true;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 로그인 이벤트 감지 → 원격 데이터 즉시 로드 (SPA 내 로그인 / OAuth 리디렉션 둘 다 처리)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event !== "SIGNED_IN" || !session) return;
+      try {
+        const adapter = createSupabaseAdapter(session.user.id);
+        const remote = await adapter.load();
+        if (!remote) {
+          const local = await createLocalAdapter().load();
+          if (local) await adapter.save(local).catch(() => {});
+          setSyncReady(true);
+          return;
+        }
+        isApplyingRemote.current = true;
+        setState(prev => ({
+          ...prev,
+          ...remote,
+          settings: { ...prev.settings, ...(remote.settings || {}) },
+          history: remote.history || [],
+          projects: remote.projects || [],
+          farms: remote.farms || [],
+          achievements: remote.achievements || {},
+          localTools: remote.localTools || [],
+          pledges: remote.pledges || [],
+        }));
+        requestAnimationFrame(() => { isApplyingRemote.current = false; });
+        setSyncReady(true);
+      } catch {
+        setSyncReady(true);
+      }
+    });
+    return () => subscription.unsubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
