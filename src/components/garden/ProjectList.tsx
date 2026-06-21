@@ -111,6 +111,15 @@ function ProjectCard({
   const [showAiChat, setShowAiChat] = useState(false);
   const [showSubTaskAdd, setShowSubTaskAdd] = useState(false);
   const [subTaskTitle, setSubTaskTitle] = useState("");
+  const [treeGlow, setTreeGlow] = useState(false);
+
+  const handleToggleProject = () => {
+    if (!p.completed) {
+      setTreeGlow(true);
+      setTimeout(() => setTreeGlow(false), 1100);
+    }
+    onToggle(p.id);
+  };
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -149,14 +158,23 @@ function ProjectCard({
 
           {/* 나무 아이콘 (완료 토글) */}
           <button
-            onClick={() => onToggle(p.id)}
-            className="mt-0.5 size-10 rounded-xl border-2 flex items-center justify-center transition-all shrink-0 border-accent/30 hover:border-primary bg-card/60"
+            onClick={handleToggleProject}
+            className={`relative mt-0.5 size-10 rounded-xl border-2 flex items-center justify-center transition-all shrink-0 border-accent/30 hover:border-primary bg-card/60 overflow-visible ${treeGlow ? "animate-tree-glow" : ""}`}
             aria-label="완료 토글"
           >
             {p.completed
               ? <Check className="size-5 text-primary" strokeWidth={3} />
               : <TreeIcon pct={pct} completed={false} />
             }
+            {treeGlow && (
+              <>
+                <span className="pointer-events-none absolute inset-0 rounded-xl animate-defeat-flash bg-gradient-to-br from-primary/40 via-emerald-400/30 to-accent/20" />
+                <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 text-base animate-petal">🌿</span>
+                <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 text-base animate-petal" style={{ animationDelay: "120ms", filter: "hue-rotate(60deg)" }}>✨</span>
+                <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 text-base animate-petal" style={{ animationDelay: "240ms" }}>🌱</span>
+                <span className="pointer-events-none absolute inset-0 rounded-xl animate-leaf-burst bg-primary/15" />
+              </>
+            )}
           </button>
 
           <div className="flex-1 min-w-0">

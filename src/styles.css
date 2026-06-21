@@ -201,3 +201,68 @@
   to   { transform: scale(1);   opacity: 1; }
 }
 .animate-stage-pop { animation: stage-pop 0.4s ease-out; }
+
+/* === MISSION DEFEAT EFFECTS === */
+
+/* 카드 충격 흔들림 */
+@keyframes impact-shake {
+  0%,100% { transform: translateX(0) scale(1); }
+  15%  { transform: translateX(-6px) scale(1.03); }
+  35%  { transform: translateX(6px) scale(1.03); }
+  55%  { transform: translateX(-3px); }
+  75%  { transform: translateX(3px); }
+}
+.animate-impact { animation: impact-shake 0.32s ease-out; }
+
+/* 황금 섬광 오버레이 */
+@keyframes defeat-flash {
+  0%   { opacity: 0; }
+  20%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+.animate-defeat-flash { animation: defeat-flash 0.45s ease-out forwards; }
+
+/* 검격 슬래시 라인 */
+@keyframes slash-sweep {
+  0%   { transform: translateX(-110%) scaleY(1); opacity: 1; }
+  65%  { transform: translateX(30%) scaleY(1); opacity: 1; }
+  100% { transform: translateX(30%) scaleY(0.5); opacity: 0; }
+}
+.animate-slash { animation: slash-sweep 0.38s cubic-bezier(0.1, 0, 0.3, 1) forwards; }
+
+/* XP 팝업 부유 */
+@keyframes xp-rise {
+  0%   { transform: translateY(0) scale(0.5); opacity: 0; }
+  18%  { transform: translateY(-6px) scale(1.35); opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateY(-52px) scale(1); opacity: 0; }
+}
+.animate-xp-rise { animation: xp-rise 1.1s ease-out forwards; }
+
+/* 파티클 6방향 */
+@keyframes p-fly-1 { to { transform: translate(-28px,-44px) scale(0.2); opacity: 0; } }
+@keyframes p-fly-2 { to { transform: translate(28px,-44px) scale(0.2); opacity: 0; } }
+@keyframes p-fly-3 { to { transform: translate(-50px,-8px) scale(0.2); opacity: 0; } }
+@keyframes p-fly-4 { to { transform: translate(50px,-8px) scale(0.2); opacity: 0; } }
+@keyframes p-fly-5 { to { transform: translate(-20px,36px) scale(0.2); opacity: 0; } }
+@keyframes p-fly-6 { to { transform: translate(20px,36px) scale(0.2); opacity: 0; } }
+.animate-p1 { animation: p-fly-1 0.65s ease-out forwards; }
+.animate-p2 { animation: p-fly-2 0.65s ease-out forwards; animation-delay: 0.03s; }
+.animate-p3 { animation: p-fly-3 0.65s ease-out forwards; animation-delay: 0.06s; }
+.animate-p4 { animation: p-fly-4 0.65s ease-out forwards; animation-delay: 0.06s; }
+.animate-p5 { animation: p-fly-5 0.65s ease-out forwards; animation-delay: 0.1s; }
+.animate-p6 { animation: p-fly-6 0.65s ease-out forwards; animation-delay: 0.1s; }
+
+/* 나무/씨앗 성장 이펙트 */
+@keyframes tree-glow-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(var(--color-primary), 0); }
+  30%  { box-shadow: 0 0 0 8px rgba(var(--color-primary), 0.35), 0 0 30px 4px rgba(var(--color-primary), 0.2); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--color-primary), 0); }
+}
+.animate-tree-glow { animation: tree-glow-pulse 0.9s ease-out forwards; }
+
+@keyframes leaf-burst {
+  0%   { transform: translate(-50%,-50%) scale(0.3) rotate(0deg); opacity: 0.9; }
+  100% { transform: translate(-50%,-50%) scale(1.8) rotate(25deg); opacity: 0; }
+}
+.animate-leaf-burst { animation: leaf-burst 0.8s ease-out forwards; }

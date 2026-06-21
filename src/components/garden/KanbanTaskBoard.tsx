@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Task, TaskKind, KanbanCol } from "@/lib/garden-store";
+import { XP_REWARD } from "@/lib/garden-store";
 import {
   DndContext,
   PointerSensor,
@@ -53,18 +54,32 @@ type Props = {
   onReorder: (orderedIds: string[]) => void;
 };
 
+const PARTICLES = [
+  { cls: "animate-p1", emoji: "⭐" },
+  { cls: "animate-p2", emoji: "✨" },
+  { cls: "animate-p3", emoji: "💥" },
+  { cls: "animate-p4", emoji: "⭐" },
+  { cls: "animate-p5", emoji: "✨" },
+  { cls: "animate-p6", emoji: "🌟" },
+];
+
 function KanbanCard({
   task,
+  burstId,
   onToggle,
   onDelete,
   onPostpone,
 }: {
   task: Task;
+  burstId: string | null;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onPostpone: (id: string) => void;
 }) {
   const colId: KanbanCol = task.kanbanCol ?? "must";
+  const isDefeating = burstId === task.id;
+  const xpGain = XP_REWARD[task.difficulty];
+
   const {
     attributes,
     listeners,
@@ -87,12 +102,49 @@ function KanbanCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all ${
+      className={`group relative flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all overflow-hidden ${
         task.completed
           ? "bg-card/20 border-white/5 opacity-50"
           : "bg-card/60 border-white/8 hover:border-primary/30"
-      }`}
+      } ${isDefeating ? "animate-impact" : ""}`}
     >
+      {/* 황금 섬광 오버레이 */}
+      {isDefeating && (
+        <div className="absolute inset-0 pointer-events-none rounded-xl animate-defeat-flash bg-gradient-to-r from-yellow-300/30 via-white/20 to-amber-300/20" />
+      )}
+
+      {/* 검격 슬래시 라인 */}
+      {isDefeating && (
+        <div className="absolute inset-0 overflow-hidden rounded-xl pointer-events-none flex items-center">
+          <div className="h-[2px] w-[150%] -ml-[25%] bg-gradient-to-r from-transparent via-white to-transparent animate-slash shadow-[0_0_8px_2px_rgba(255,255,255,0.6)]" />
+        </div>
+      )}
+
+      {/* 파티클 버스트 */}
+      {isDefeating && (
+        <div className="absolute left-1/2 top-1/2 pointer-events-none z-20">
+          {PARTICLES.map((p) => (
+            <span
+              key={p.cls}
+              className={`absolute text-[11px] ${p.cls}`}
+              style={{ transform: "translate(-50%,-50%)" }}
+            >
+              {p.emoji}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* XP 팝업 */}
+      {isDefeating && (
+        <div className="absolute inset-x-0 top-0 flex justify-center pointer-events-none z-30">
+          <span className="text-[11px] font-bold text-yellow-300 drop-shadow-[0_0_6px_rgba(255,215,0,0.8)] animate-xp-rise whitespace-nowrap">
+            ⚔️ +{xpGain} XP
+          </span>
+        </div>
+      )}
+
+      {/* 드래그 핸들 */}
       <button
         {...attributes}
         {...listeners}
@@ -102,9 +154,10 @@ function KanbanCard({
         <GripVertical className="size-3.5" />
       </button>
 
+      {/* 완료 버튼 */}
       <button
         onClick={() => onToggle(task.id)}
-        className={`size-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+        className={`relative size-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
           task.completed
             ? "bg-primary border-primary"
             : "border-white/20 hover:border-primary"
@@ -113,6 +166,9 @@ function KanbanCard({
       >
         {task.completed && (
           <Check className="size-2.5 text-primary-foreground" strokeWidth={3} />
+        )}
+        {isDefeating && (
+          <span className="pointer-events-none absolute inset-0 rounded-full bg-primary/50 animate-bloom-burst" />
         )}
       </button>
 
@@ -149,6 +205,7 @@ function KanbanCard({
 function KanbanColumn({
   col,
   tasks,
+  burstId,
   onToggle,
   onDelete,
   onPostpone,
@@ -156,6 +213,7 @@ function KanbanColumn({
 }: {
   col: (typeof COLUMNS)[number];
   tasks: Task[];
+  burstId: string | null;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onPostpone: (id: string) => void;
@@ -228,6 +286,7 @@ function KanbanColumn({
             <KanbanCard
               key={task.id}
               task={task}
+              burstId={burstId}
               onToggle={onToggle}
               onDelete={onDelete}
               onPostpone={onPostpone}
@@ -288,6 +347,16 @@ export function KanbanTaskBoard({
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [burstId, setBurstId] = useState<string | null>(null);
+
+  const handleToggle = (id: string) => {
+    const task = tasks.find((t) => t.id === id);
+    if (task && !task.completed) {
+      setBurstId(id);
+      setTimeout(() => setBurstId(null), 1200);
+    }
+    onToggle(id);
+  };
 
   const tasksByCol = Object.fromEntries(
     COLUMNS.map((col) => [
@@ -355,7 +424,8 @@ export function KanbanTaskBoard({
             key={col.id}
             col={col}
             tasks={tasksByCol[col.id]}
-            onToggle={onToggle}
+            burstId={burstId}
+            onToggle={handleToggle}
             onDelete={onDelete}
             onPostpone={onPostpone}
             onAdd={handleAddToCol}
