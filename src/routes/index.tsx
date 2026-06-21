@@ -5,7 +5,7 @@ import { useToolsSheet } from "@/lib/tools-sheet";
 import type { ConditionMode } from "@/lib/garden-store";
 import { useReminders, requestNotificationPermission } from "@/lib/notifications";
 import { Avatar } from "@/components/garden/Avatar";
-import { TaskList } from "@/components/garden/TaskList";
+import { KanbanTaskBoard } from "@/components/garden/KanbanTaskBoard";
 import { ProjectList } from "@/components/garden/ProjectList";
 import { QuestPanel } from "@/components/garden/QuestPanel";
 import { AchievementCodex } from "@/components/garden/AchievementCodex";
@@ -13,7 +13,17 @@ import { SidePanels } from "@/components/garden/SidePanels";
 import { ConditionSelector } from "@/components/garden/ConditionSelector";
 import { AiSidePanel } from "@/components/AiSidePanel";
 import { PledgeBoard } from "@/components/PledgeBoard";
-import { Settings as SettingsIcon, BarChart3, Bell, BellOff, Wrench, Sparkles, Map } from "lucide-react";
+import {
+  Settings as SettingsIcon,
+  BarChart3,
+  Bell,
+  BellOff,
+  Wrench,
+  Sparkles,
+  Map,
+  Swords,
+  Leaf,
+} from "lucide-react";
 import {
   DndContext,
   PointerSensor,
@@ -71,22 +81,28 @@ function Index() {
     toggleProjectTool,
     updateProject,
     setPledge,
+    updateTask,
   } = useGarden();
   const { tools: sheetTools } = useToolsSheet(state.settings.toolsSheetUrl ?? "");
-  const availableTools = useMemo(() => [...(state.localTools ?? []), ...sheetTools], [state.localTools, sheetTools]);
+  const availableTools = useMemo(
+    () => [...(state.localTools ?? []), ...sheetTools],
+    [state.localTools, sheetTools],
+  );
   const today = todayStr();
   const todaysTasks = state.tasks.filter((t) => t.date === today);
   const standalone = todaysTasks.filter((t) => !t.projectId);
   const todayPendingTasks = todaysTasks.filter((t) => !t.completed);
   const [showAiPanel, setShowAiPanel] = useState(false);
+  const [activeTab, setActiveTab] = useState<"today" | "garden">("today");
 
   // 컨디션 필터 적용
   const visibleStandalone = todayCondition
     ? filterTasksByCondition(standalone, todayCondition)
     : standalone;
 
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
 
   useReminders(state.tasks, state.settings, state.notificationsEnabled && hydrated);
 
@@ -96,7 +112,6 @@ function Index() {
     const params = new URLSearchParams(window.location.search);
     const scrollTo = params.get("scroll");
     if (!scrollTo) return;
-    // DOM 렌더 후 실행
     const timer = setTimeout(() => {
       const el = document.getElementById(scrollTo);
       if (!el) return;
@@ -108,7 +123,6 @@ function Index() {
         el.style.outline = "";
         el.style.outlineOffset = "";
       }, 2000);
-      // URL에서 파라미터 제거 (뒤로가기 시 재실행 방지)
       const url = new URL(window.location.href);
       url.searchParams.delete("scroll");
       window.history.replaceState({}, "", url.toString());
@@ -130,37 +144,13 @@ function Index() {
     }
   };
 
-  const handleDragStart = (e: DragStartEvent) => setActiveId(String(e.active.id));
-
-  const handleDragEnd = (e: DragEndEvent) => {
-    setActiveId(null);
+  // 정원 탭에서 프로젝트 드래그 앤 드롭
+  const handleGardenDragStart = (_e: DragStartEvent) => {};
+  const handleGardenDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
     if (!over) return;
-
     const activeData = active.data.current as { type?: string } | undefined;
-    const overData = over.data.current as { type?: string; projectId?: string } | undefined;
-
-    // Task → Project drop
-    if (activeData?.type === "task" && overData?.type === "project-drop" && overData.projectId) {
-      assignTaskToProject(String(active.id), overData.projectId);
-      return;
-    }
-
-    // Task → Task reorder (within standalone list)
-    if (activeData?.type === "task" && overData?.type === "task") {
-      const ids = standalone
-        .slice()
-        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-        .map((t) => t.id);
-      const oldIdx = ids.indexOf(String(active.id));
-      const newIdx = ids.indexOf(String(over.id));
-      if (oldIdx !== -1 && newIdx !== -1 && oldIdx !== newIdx) {
-        reorderTasks(arrayMove(ids, oldIdx, newIdx));
-      }
-      return;
-    }
-
-    // Project reorder
+    const overData = over.data.current as { type?: string } | undefined;
     if (activeData?.type === "project" && overData?.type === "project") {
       const ids = state.projects
         .slice()
@@ -216,12 +206,8 @@ function Index() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {/* 컨디션 칩 — 현재 상태 표시 + 클릭 시 변경 */}
             {todayCondition && (
-              <ConditionChip
-                condition={todayCondition}
-                onChange={setCondition}
-              />
+              <ConditionChip condition={todayCondition} onChange={setCondition} />
             )}
             <button
               onClick={handleToggleNotifications}
@@ -270,72 +256,112 @@ function Index() {
           </div>
         </header>
 
-        {/* DnD 영역: TaskList의 task를 ProjectList의 project로 드래그하는 동작 때문에
-            DndContext가 두 컴포넌트를 모두 감싸야 함. PledgeBoard/Avatar는 DnD와 무관하지만
-            안에 있어도 무해. */}
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          {/* 오늘의 임무 — 헤더 바로 아래, 좁은 중앙 정렬 */}
-          <section className="max-w-3xl mx-auto">
-            <TaskList
-              tasks={visibleStandalone}
-              onToggle={toggleTask}
-              onDelete={deleteTask}
-              onPostpone={postponeTask}
-              onAdd={addTask}
-              onReorder={reorderTasks}
-            />
-          </section>
+        {/* 탭 버튼 */}
+        <div className="flex bg-card/40 border border-white/10 rounded-2xl p-1 gap-1 w-fit">
+          <button
+            onClick={() => setActiveTab("today")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${
+              activeTab === "today"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Swords className="size-3.5" />
+            오늘의 임무
+          </button>
+          <button
+            onClick={() => setActiveTab("garden")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition ${
+              activeTab === "garden"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Leaf className="size-3.5" />
+            나무 &amp; 농장
+          </button>
+        </div>
 
-          {/* 각오 보드 */}
-          <PledgeBoard pledges={state.pledges ?? []} onSet={setPledge} />
+        {/* 오늘의 임무 탭 */}
+        {activeTab === "today" && (
+          <div className="space-y-6">
+            {/* 나의 각오 */}
+            <PledgeBoard pledges={state.pledges ?? []} onSet={setPledge} />
 
-          {/* Avatar HUD */}
-          <Avatar
-            totalXp={state.totalXp}
-            xp={state.xp}
-            combo={state.combo}
-            streak={state.streak}
-          />
-
-          {/* Main grid */}
-          <main className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
-            <div className="space-y-6 min-w-0">
-              <ProjectList
-                projects={state.projects}
-                farms={state.farms}
-                tasks={state.tasks}
-                totalXp={state.totalXp}
-                availableTools={availableTools}
-                onAdd={addProject}
-                onToggle={toggleProject}
-                onDelete={deleteProject}
-                onReorder={reorderProjects}
-                onAssignTask={assignTaskToProject}
-                onAddFarm={addFarm}
-                onDeleteFarm={deleteFarm}
-                onUpdateFarm={updateFarm}
-                onMoveProjectToFarm={moveProjectToFarm}
-                onToggleFarmTool={toggleFarmTool}
-                onToggleProjectTool={toggleProjectTool}
-                onUpdateProject={updateProject}
-                onAddSubTask={addSubTask}
-                settings={state.settings}
-                onAddTasksToProject={handleAddTasksToProject}
-                onMoveFarm={moveFarm}
+            {/* 칸반 보드 */}
+            <section>
+              <h2 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+                오늘의 임무
+              </h2>
+              <KanbanTaskBoard
+                tasks={visibleStandalone}
+                onToggle={toggleTask}
+                onDelete={deleteTask}
+                onPostpone={postponeTask}
+                onAdd={addTask}
+                onUpdateTask={updateTask}
+                onReorder={reorderTasks}
               />
+            </section>
+
+            {/* Avatar + 사이드 패널 */}
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
+              <Avatar
+                totalXp={state.totalXp}
+                xp={state.xp}
+                combo={state.combo}
+                streak={state.streak}
+              />
+              <aside className="space-y-6">
+                <QuestPanel
+                  tasks={todaysTasks}
+                  projects={state.projects}
+                  combo={state.combo}
+                />
+                <SidePanels
+                  tasks={todaysTasks}
+                  streak={state.streak}
+                  totalXp={state.totalXp}
+                />
+                <AchievementCodex unlocked={state.achievements} />
+              </aside>
             </div>
-            <aside className="space-y-6">
-              <QuestPanel tasks={todaysTasks} projects={state.projects} combo={state.combo} />
-              <SidePanels tasks={todaysTasks} streak={state.streak} totalXp={state.totalXp} />
-              <AchievementCodex unlocked={state.achievements} />
-            </aside>
-          </main>
-        </DndContext>
+          </div>
+        )}
+
+        {/* 나무 & 농장 탭 */}
+        {activeTab === "garden" && (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleGardenDragStart}
+            onDragEnd={handleGardenDragEnd}
+          >
+            <ProjectList
+              projects={state.projects}
+              farms={state.farms}
+              tasks={state.tasks}
+              totalXp={state.totalXp}
+              availableTools={availableTools}
+              onAdd={addProject}
+              onToggle={toggleProject}
+              onDelete={deleteProject}
+              onReorder={reorderProjects}
+              onAssignTask={assignTaskToProject}
+              onAddFarm={addFarm}
+              onDeleteFarm={deleteFarm}
+              onUpdateFarm={updateFarm}
+              onMoveProjectToFarm={moveProjectToFarm}
+              onToggleFarmTool={toggleFarmTool}
+              onToggleProjectTool={toggleProjectTool}
+              onUpdateProject={updateProject}
+              onAddSubTask={addSubTask}
+              settings={state.settings}
+              onAddTasksToProject={handleAddTasksToProject}
+              onMoveFarm={moveFarm}
+            />
+          </DndContext>
+        )}
 
         <footer className="text-center text-xs text-muted-foreground pt-6 border-t border-white/5">
           매일 <span className="text-primary">{state.settings.morningTime}</span>와{" "}
@@ -376,7 +402,10 @@ function ConditionChip({
               return (
                 <button
                   key={m}
-                  onClick={() => { onChange(m); setOpen(false); }}
+                  onClick={() => {
+                    onChange(m);
+                    setOpen(false);
+                  }}
                   className={`w-full flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-white/5 transition text-left ${m === condition ? "bg-white/5" : ""}`}
                 >
                   <span>{cm.icon}</span>

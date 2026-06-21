@@ -6,6 +6,8 @@ import { createSupabaseAdapter } from "@/lib/supabase-adapter";
 
 export type TaskKind = "must" | "flex"; // must = 당일 필수(벌점), flex = 연기 가능(벌점 없음)
 
+export type KanbanCol = "must" | "deadline" | "flex" | "quick";
+
 export type ConditionMode = "best" | "normal" | "low" | "sick";
 
 export const CONDITION_META: Record<
@@ -24,6 +26,7 @@ export type Task = {
   time: string; // "HH:MM"
   difficulty: "easy" | "medium" | "hard";
   kind: TaskKind;
+  kanbanCol?: KanbanCol; // 칸반 컬럼 (미설정 시 "must")
   completed: boolean;
   completedAt?: number;
   createdAt: number;
@@ -611,7 +614,7 @@ export function useGarden() {
   }, [hydrated, syncReady, state.lastActiveDate, state.tasks]);
 
   const addTask = useCallback(
-    (title: string, time: string, difficulty: Task["difficulty"], kind: TaskKind) => {
+    (title: string, time: string, difficulty: Task["difficulty"], kind: TaskKind, kanbanCol?: KanbanCol) => {
       setStateUser((s) => ({
         ...s,
         tasks: [
@@ -622,6 +625,7 @@ export function useGarden() {
             time,
             difficulty,
             kind,
+            kanbanCol: kanbanCol ?? "must",
             completed: false,
             createdAt: Date.now(),
             date: todayStr(),
@@ -634,6 +638,13 @@ export function useGarden() {
     },
     [],
   );
+
+  const updateTask = useCallback((id: string, patch: Partial<Task>) => {
+    setStateUser((s) => ({
+      ...s,
+      tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+    }));
+  }, []);
 
   const recordHistory = (state: GardenState, date: string, patch: Partial<DayLog>) => {
     const history = [...state.history];
@@ -1163,5 +1174,6 @@ export function useGarden() {
     updateLocalTool,
     deleteLocalTool,
     setPledge,
+    updateTask,
   };
 }
