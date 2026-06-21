@@ -6,10 +6,9 @@ import type { ConditionMode } from "@/lib/garden-store";
 import { useReminders, requestNotificationPermission } from "@/lib/notifications";
 import { Avatar } from "@/components/garden/Avatar";
 import { KanbanTaskBoard } from "@/components/garden/KanbanTaskBoard";
+import { TodayHUD } from "@/components/garden/TodayHUD";
 import { ProjectList } from "@/components/garden/ProjectList";
-import { QuestPanel } from "@/components/garden/QuestPanel";
 import { AchievementCodex } from "@/components/garden/AchievementCodex";
-import { SidePanels } from "@/components/garden/SidePanels";
 import { ConditionSelector } from "@/components/garden/ConditionSelector";
 import { AiSidePanel } from "@/components/AiSidePanel";
 import { PledgeBoard } from "@/components/PledgeBoard";
@@ -284,47 +283,38 @@ function Index() {
 
         {/* 오늘의 임무 탭 */}
         {activeTab === "today" && (
-          <div className="space-y-6">
+          <div className="space-y-5">
+            {/* 퀘스트 + 연속개화 + 오늘의 성장 HUD */}
+            <TodayHUD
+              tasks={visibleStandalone}
+              projects={state.projects}
+              streak={state.streak}
+              combo={state.combo}
+            />
+
             {/* 나의 각오 */}
             <PledgeBoard pledges={state.pledges ?? []} onSet={setPledge} />
 
             {/* 칸반 보드 */}
-            <section>
-              <h2 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
-                오늘의 임무
-              </h2>
-              <KanbanTaskBoard
-                tasks={visibleStandalone}
-                onToggle={toggleTask}
-                onDelete={deleteTask}
-                onPostpone={postponeTask}
-                onAdd={addTask}
-                onUpdateTask={updateTask}
-                onReorder={reorderTasks}
-              />
-            </section>
+            <KanbanTaskBoard
+              tasks={visibleStandalone}
+              onToggle={toggleTask}
+              onDelete={deleteTask}
+              onPostpone={postponeTask}
+              onAdd={addTask}
+              onUpdateTask={updateTask}
+              onReorder={reorderTasks}
+            />
 
-            {/* Avatar + 사이드 패널 */}
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
+            {/* Avatar + 업적 */}
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
               <Avatar
                 totalXp={state.totalXp}
                 xp={state.xp}
                 combo={state.combo}
                 streak={state.streak}
               />
-              <aside className="space-y-6">
-                <QuestPanel
-                  tasks={todaysTasks}
-                  projects={state.projects}
-                  combo={state.combo}
-                />
-                <SidePanels
-                  tasks={todaysTasks}
-                  streak={state.streak}
-                  totalXp={state.totalXp}
-                />
-                <AchievementCodex unlocked={state.achievements} />
-              </aside>
+              <AchievementCodex unlocked={state.achievements} />
             </div>
           </div>
         )}

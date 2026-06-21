@@ -20,6 +20,14 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { Check, Trash2, Clock, GripVertical, Plus } from "lucide-react";
 
+// must/deadline → kind:"must" (벌점), flex/quick → kind:"flex" (보상)
+const COL_KIND: Record<KanbanCol, TaskKind> = {
+  must: "must",
+  deadline: "must",
+  flex: "flex",
+  quick: "flex",
+};
+
 const COLUMNS: {
   id: KanbanCol;
   icon: string;
@@ -27,11 +35,12 @@ const COLUMNS: {
   desc: string;
   accent: string;
   border: string;
+  penalty: boolean; // true = 미완료 시 벌점
 }[] = [
-  { id: "must",     icon: "🔥", title: "필수 미션",    desc: "오늘 반드시",    accent: "text-rose-400",    border: "border-rose-500/25" },
-  { id: "deadline", icon: "⏰", title: "데드라인 미션", desc: "기한/외부 요청", accent: "text-amber-400",   border: "border-amber-500/25" },
-  { id: "flex",     icon: "🌿", title: "여유 미션",    desc: "시간이 되면",    accent: "text-emerald-400", border: "border-emerald-500/25" },
-  { id: "quick",    icon: "⚡", title: "빠른 미션",    desc: "금방 끝나는",    accent: "text-blue-400",    border: "border-blue-500/25" },
+  { id: "must",     icon: "🔥", title: "필수 미션",    desc: "오늘 반드시",    accent: "text-rose-400",    border: "border-rose-500/25",    penalty: true  },
+  { id: "deadline", icon: "⏰", title: "데드라인 미션", desc: "기한/외부 요청", accent: "text-amber-400",   border: "border-amber-500/25",   penalty: true  },
+  { id: "flex",     icon: "🌿", title: "여유 미션",    desc: "시간이 되면",    accent: "text-emerald-400", border: "border-emerald-500/25", penalty: false },
+  { id: "quick",    icon: "⚡", title: "빠른 미션",    desc: "금방 끝나는",    accent: "text-blue-400",    border: "border-blue-500/25",    penalty: false },
 ];
 
 type Props = {
@@ -180,7 +189,18 @@ function KanbanColumn({
         <div className="flex items-center gap-1.5">
           <span className="text-sm">{col.icon}</span>
           <div>
-            <p className={`text-xs font-semibold ${col.accent}`}>{col.title}</p>
+            <div className="flex items-center gap-1.5">
+              <p className={`text-xs font-semibold ${col.accent}`}>{col.title}</p>
+              {col.penalty ? (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-rose-500/15 text-rose-400 font-medium border border-rose-500/20">
+                  벌점
+                </span>
+              ) : (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-medium border border-emerald-500/20">
+                  보상
+                </span>
+              )}
+            </div>
             <p className="text-[10px] text-muted-foreground leading-none mt-0.5">
               {col.desc}
             </p>
@@ -314,12 +334,12 @@ export function KanbanTaskBoard({
         onReorder(arrayMove(ids, oldIdx, newIdx));
       }
     } else {
-      onUpdateTask(activeId, { kanbanCol: targetCol });
+      onUpdateTask(activeId, { kanbanCol: targetCol, kind: COL_KIND[targetCol] });
     }
   };
 
   const handleAddToCol = (col: KanbanCol, title: string) => {
-    onAdd(title, "09:00", "medium", "flex", col);
+    onAdd(title, "09:00", "medium", COL_KIND[col], col);
   };
 
   return (
