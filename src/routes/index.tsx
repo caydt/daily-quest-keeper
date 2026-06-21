@@ -346,6 +346,7 @@ function Index() {
               onToggleProjectTool={toggleProjectTool}
               onUpdateProject={updateProject}
               onAddSubTask={addSubTask}
+              onToggleSubTask={toggleTask}
               settings={state.settings}
               onAddTasksToProject={handleAddTasksToProject}
               onMoveFarm={moveFarm}

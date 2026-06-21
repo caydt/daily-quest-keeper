@@ -27,6 +27,7 @@ const baseProps = {
   onMoveProjectToFarm: vi.fn(),
   onAddTree: vi.fn(),
   onAddSubTask: vi.fn(),
+  onToggleSubTask: vi.fn(),
   onToggleProjectTool: vi.fn(),
   onUpdateProject: vi.fn(),
   settings: {

@@ -51,6 +51,7 @@ type Props = {
   onToggleProjectTool: (projectId: string, toolId: string) => void;
   onUpdateProject: (id: string, patch: { aiUrl?: string }) => void;
   onAddSubTask: (projectId: string, title: string) => void;
+  onToggleSubTask: (id: string) => void;
   settings: Settings;
   onAddTasksToProject: (projectId: string | null, titles: string[]) => void;
   onMoveFarm: (id: string, direction: "up" | "down") => void;
@@ -80,6 +81,7 @@ function ProjectCard({
   onToggleProjectTool,
   onUpdateProject,
   onAddSubTask,
+  onToggleSubTask,
   settings,
   onAddTasksToProject,
 }: {
@@ -95,6 +97,7 @@ function ProjectCard({
   onToggleProjectTool: (toolId: string) => void;
   onUpdateProject: (patch: { aiUrl?: string }) => void;
   onAddSubTask: (projectId: string, title: string) => void;
+  onToggleSubTask: (id: string) => void;
   settings: Settings;
   onAddTasksToProject: (projectId: string | null, titles: string[]) => void;
 }) {
@@ -112,6 +115,16 @@ function ProjectCard({
   const [showSubTaskAdd, setShowSubTaskAdd] = useState(false);
   const [subTaskTitle, setSubTaskTitle] = useState("");
   const [treeGlow, setTreeGlow] = useState(false);
+  const [chipBurstId, setChipBurstId] = useState<string | null>(null);
+
+  const handleToggleChip = (id: string) => {
+    const task = childTasks.find((t) => t.id === id);
+    if (task && !task.completed) {
+      setChipBurstId(id);
+      setTimeout(() => setChipBurstId(null), 800);
+    }
+    onToggleSubTask(id);
+  };
 
   const handleToggleProject = () => {
     if (!p.completed) {
@@ -225,12 +238,23 @@ function ProjectCard({
                   {childTasks.map((c) => (
                     <span
                       key={c.id}
-                      className={`group/chip inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${
+                      onClick={() => handleToggleChip(c.id)}
+                      className={`relative group/chip inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border cursor-pointer select-none transition-all ${
                         c.completed
                           ? "border-primary/30 bg-primary/10 text-primary line-through"
-                          : "border-white/10 bg-black/30 text-muted-foreground"
-                      }`}
+                          : "border-white/10 bg-black/30 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                      } ${chipBurstId === c.id ? "scale-110 border-primary/50" : ""}`}
                     >
+                      {chipBurstId === c.id && (
+                        <span
+                          className="absolute inset-x-0 flex justify-center pointer-events-none z-10"
+                          style={{ top: "-18px" }}
+                        >
+                          <span className="animate-chip-sp1 text-[10px]">✨</span>
+                          <span className="animate-chip-sp2 text-[10px] mx-0.5">🌱</span>
+                          <span className="animate-chip-sp3 text-[10px]">✨</span>
+                        </span>
+                      )}
                       {c.title}
                       <button
                         onClick={(e) => { e.stopPropagation(); onUnassign(c.id); }}
@@ -487,6 +511,41 @@ function ProjectCard({
   );
 }
 
+// ── 농장 할일 심기 그리드
+function PlantGrid({
+  trees,
+  tasks,
+  lastPlantedId,
+}: {
+  trees: Project[];
+  tasks: Task[];
+  lastPlantedId: string | null;
+}) {
+  const farmTasks = tasks.filter((t) => trees.some((p) => p.id === t.projectId));
+  if (farmTasks.length === 0) return null;
+  const MAX = 32;
+  const shown = farmTasks.slice(0, MAX);
+  const extra = farmTasks.length - MAX;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 px-5 py-2.5 border-b border-emerald-500/10">
+      {shown.map((t) => (
+        <span key={t.id} title={t.title}>
+          {t.completed ? (
+            <span
+              className={`text-sm leading-none ${lastPlantedId === t.id ? "animate-seedling-pop inline-block" : ""}`}
+            >
+              🌱
+            </span>
+          ) : (
+            <span className="inline-block w-3 h-3 rounded-full border border-emerald-900/40 bg-emerald-950/60 opacity-60" />
+          )}
+        </span>
+      ))}
+      {extra > 0 && <span className="text-[10px] text-muted-foreground ml-0.5">+{extra}</span>}
+    </div>
+  );
+}
+
 // ── 농장 카드 (나무들을 담는 컨테이너)
 // 테스트 노출용 export — 외부 사용 금지, 다른 모듈에서 import하지 말 것
 export function FarmCard({
@@ -505,6 +564,7 @@ export function FarmCard({
   onMoveProjectToFarm,
   onAddTree,
   onAddSubTask,
+  onToggleSubTask,
   onToggleProjectTool,
   onUpdateProject,
   settings,
@@ -531,6 +591,7 @@ export function FarmCard({
   onAddSubTask: (projectId: string, title: string) => void;
   onToggleProjectTool: (projectId: string, toolId: string) => void;
   onUpdateProject: (id: string, patch: { aiUrl?: string }) => void;
+  onToggleSubTask: (id: string) => void;
   settings: Settings;
   onAddTasksToProject: (projectId: string | null, titles: string[]) => void;
   isFirst: boolean;
@@ -548,6 +609,16 @@ export function FarmCard({
   const [showInlineAdd, setShowInlineAdd] = useState(false);
   const [inlineTitle, setInlineTitle] = useState("");
   const [showMandalart, setShowMandalart] = useState(false);
+  const [lastPlantedId, setLastPlantedId] = useState<string | null>(null);
+
+  const handleToggleSubTask = (id: string) => {
+    const task = tasks.find((t) => t.id === id);
+    if (task && !task.completed) {
+      setLastPlantedId(id);
+      setTimeout(() => setLastPlantedId(null), 800);
+    }
+    onToggleSubTask(id);
+  };
 
   // 농장 성장 계산
   const treeStats = trees.map(p => {
@@ -687,6 +758,9 @@ export function FarmCard({
 
       </div>
 
+      {/* 할일 심기 그리드 */}
+      <PlantGrid trees={trees} tasks={tasks} lastPlantedId={lastPlantedId} />
+
       {/* 도구 바 */}
       <div className="px-5 py-2 border-b border-emerald-500/10 relative">
         <ToolChipBar
@@ -795,6 +869,7 @@ export function FarmCard({
                   onToggleProjectTool={(toolId) => onToggleProjectTool(p.id, toolId)}
                   onUpdateProject={(patch) => onUpdateProject(p.id, patch)}
                   onAddSubTask={onAddSubTask}
+                  onToggleSubTask={handleToggleSubTask}
                   settings={settings}
                   onAddTasksToProject={onAddTasksToProject}
                 />
@@ -837,6 +912,7 @@ export function ProjectList({
   onToggleFarmTool,
   onToggleProjectTool,
   onUpdateProject,
+  onToggleSubTask,
   settings,
   onAddTasksToProject,
   onAddSubTask,
@@ -1030,6 +1106,7 @@ export function ProjectList({
                 onMoveProjectToFarm={onMoveProjectToFarm}
                 onAddTree={(farmId, title) => onAdd(title, undefined, undefined, farmId)}
                 onAddSubTask={onAddSubTask}
+                onToggleSubTask={onToggleSubTask}
                 onToggleProjectTool={onToggleProjectTool}
                 onUpdateProject={onUpdateProject}
                 settings={settings}
@@ -1068,6 +1145,7 @@ export function ProjectList({
                         onToggleProjectTool={(toolId) => onToggleProjectTool(p.id, toolId)}
                         onUpdateProject={(patch) => onUpdateProject(p.id, patch)}
                         onAddSubTask={onAddSubTask}
+                        onToggleSubTask={onToggleSubTask}
                         settings={settings}
                         onAddTasksToProject={onAddTasksToProject}
                       />
