@@ -98,11 +98,15 @@ function KanbanCard({
     opacity: isDragging ? 0.35 : 1,
   };
 
+  const cardStyle: React.CSSProperties = isDefeating
+    ? { ...style, animationDelay: "0.25s", animationFillMode: "both" }
+    : style;
+
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      className={`group relative flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all overflow-hidden ${
+      style={cardStyle}
+      className={`group relative flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all ${
         task.completed
           ? "bg-card/20 border-white/5 opacity-50"
           : "bg-card/60 border-white/8 hover:border-primary/30"
@@ -110,14 +114,56 @@ function KanbanCard({
     >
       {/* 황금 섬광 오버레이 */}
       {isDefeating && (
-        <div className="absolute inset-0 pointer-events-none rounded-xl animate-defeat-flash bg-gradient-to-r from-yellow-300/30 via-white/20 to-amber-300/20" />
+        <div
+          className="absolute inset-0 pointer-events-none rounded-xl animate-defeat-flash bg-gradient-to-r from-yellow-300/30 via-white/20 to-amber-300/20"
+          style={{ animationDelay: "0.27s", animationFillMode: "both" }}
+        />
       )}
 
-      {/* 검격 슬래시 라인 */}
+      {/* 발사체 — 왼쪽에서 날아와 꽂힘 */}
       {isDefeating && (
-        <div className="absolute inset-0 overflow-hidden rounded-xl pointer-events-none flex items-center">
-          <div className="h-[2px] w-[150%] -ml-[25%] bg-gradient-to-r from-transparent via-white to-transparent animate-slash shadow-[0_0_8px_2px_rgba(255,255,255,0.6)]" />
-        </div>
+        <div
+          className="absolute pointer-events-none z-30 animate-proj-fly"
+          style={{
+            top: "calc(50% - 2px)",
+            left: "calc(50% - 26px)",
+            width: "52px",
+            height: "4px",
+            background: "linear-gradient(90deg, transparent, rgba(255,220,50,0.4), rgba(255,240,180,0.9), white)",
+            borderRadius: "0 3px 3px 0",
+            boxShadow: "0 0 10px 4px rgba(255,255,255,0.7), 0 0 22px 8px rgba(255,200,50,0.45)",
+          }}
+        />
+      )}
+
+      {/* 충격파 링 */}
+      {isDefeating && (
+        <>
+          <div
+            className="absolute pointer-events-none z-20"
+            style={{
+              top: "50%", left: "50%",
+              width: "20px", height: "20px",
+              marginLeft: "-10px", marginTop: "-10px",
+              borderRadius: "50%",
+              border: "2px solid rgba(255,230,80,0.9)",
+              animation: "shockring 0.48s ease-out both",
+              animationDelay: "0.28s",
+            }}
+          />
+          <div
+            className="absolute pointer-events-none z-20"
+            style={{
+              top: "50%", left: "50%",
+              width: "20px", height: "20px",
+              marginLeft: "-10px", marginTop: "-10px",
+              borderRadius: "50%",
+              border: "1.5px solid rgba(255,255,255,0.5)",
+              animation: "shockring 0.65s ease-out both",
+              animationDelay: "0.32s",
+            }}
+          />
+        </>
       )}
 
       {/* 파티클 버스트 */}
@@ -138,7 +184,10 @@ function KanbanCard({
       {/* XP 팝업 */}
       {isDefeating && (
         <div className="absolute inset-x-0 top-0 flex justify-center pointer-events-none z-30">
-          <span className="text-[11px] font-bold text-yellow-300 drop-shadow-[0_0_6px_rgba(255,215,0,0.8)] animate-xp-rise whitespace-nowrap">
+          <span
+            className="text-[11px] font-bold text-yellow-300 drop-shadow-[0_0_6px_rgba(255,215,0,0.8)] animate-xp-rise whitespace-nowrap"
+            style={{ animationDelay: "0.32s", animationFillMode: "both" }}
+          >
             ⚔️ +{xpGain} XP
           </span>
         </div>
@@ -168,7 +217,10 @@ function KanbanCard({
           <Check className="size-2.5 text-primary-foreground" strokeWidth={3} />
         )}
         {isDefeating && (
-          <span className="pointer-events-none absolute inset-0 rounded-full bg-primary/50 animate-bloom-burst" />
+          <span
+            className="pointer-events-none absolute inset-0 rounded-full bg-primary/50 animate-bloom-burst"
+            style={{ animationDelay: "0.28s", animationFillMode: "both" }}
+          />
         )}
       </button>
 
